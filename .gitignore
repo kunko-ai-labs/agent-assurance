@@ -21,3 +21,6 @@ venv/
 *.sarif
 aa-report.md
 docs/.frames/
+docs/launch/composition/node_modules/
+docs/launch/composition/.hyperframes/
+docs/launch/composition/assets/

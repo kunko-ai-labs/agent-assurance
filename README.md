@@ -36,7 +36,21 @@ Live: [the demo PR](https://github.com/kunko-ai-labs/agent-assurance/pull/16) st
 
 ## Why this and not a scanner
 
-Vulnerability scanners look for poisoned tools and leaked secrets. Permission-diff bots show what changed. Neither answers the governance question: **does this agent still do only what we said it does?** Agent Assurance answers it deterministically, maps every finding to the **OWASP Top 10 for Agentic Applications**, knows the difference between *having* a power and *using it without a human*, and leaves a per-commit record an auditor can reconstruct — the shape EU AI Act art. 12 asks for. What else exists and where this sits: [`docs/landscape.md`](docs/landscape.md).
+Vulnerability scanners look for poisoned tools and leaked secrets. Permission-diff bots show what changed. Neither answers the governance question: **does this agent still do only what we said it does?**
+
+| | Vulnerability scanners (Snyk agent-scan, Cisco MCP Scanner, agentshield) | Permission-diff bots (agentcapdiff & co.) | **Agent Assurance** |
+|---|---|---|---|
+| Finds poisoned tools, leaked secrets | ✅ | — | — (use them for that) |
+| Shows what a PR changed | — | ✅ | ✅ |
+| **Verifies a declared promise** | — | — | ✅ file:line |
+| Knows *having* a power ≠ *using it without a human* | — | — | ✅ |
+| OWASP Agentic Top 10 mapping | — | — | ✅ |
+| Signed, per-commit evidence (in-toto / Sigstore) | — | — | ✅ |
+| LLM in the verdict | some | — | never |
+
+Checked 2026-09-17; details and sources in [`docs/landscape.md`](docs/landscape.md). This is the governance layer *under* a scanner, not a replacement for one.
+
+**Not for you if** you want prompt-injection or tool-poisoning detection (use a scanner), runtime interception of tool calls (a different product), or a score for agents that have no configuration in a repo (there is nothing to observe).
 
 ## One promise, three enforcement points
 
@@ -79,6 +93,13 @@ CLI (`scan`, `diff`, `check`, `attest`, `validate`; formats `md`, `json`, `sarif
 
 **Exit codes are a contract:** `0` pass · `1` gate tripped · `2` usage error.
 
+### Running third-party code in your CI — what you should check
+
+- **Pin by commit SHA**, not by tag: `uses: kunko-ai-labs/agent-assurance@<sha> # v0.5.0`. Tags can move; a SHA cannot. Dependabot keeps the comment and the SHA in step. Our own workflows pin every action the same way.
+- **What the Action does:** `pip install` of this repository at that SHA, then runs the CLI on your files. It makes **no network calls** of its own (the only outbound traffic is `pip` and, if you opt in, `upload-sarif` / `attest` to GitHub). It executes nothing from your repo, never starts an MCP server, never reads a secret's value.
+- **Least privilege:** `contents: read` is enough for `check` and `scan`; add `pull-requests: write` only for the diff comment, `security-events: write` only for SARIF upload, `id-token: write` + `attestations: write` only for signing.
+- **Verify what you get:** every release is signed; `gh attestation verify` on the artifacts, and the [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/kunko-ai-labs/agent-assurance) of this repo is public.
+
 ## The capability card
 
 `--format html` produces a single self-contained file — the agent's nutrition label — for auditors, customers or your manager. Light or dark, follows the viewer.
@@ -93,7 +114,19 @@ CLI (`scan`, `diff`, `check`, `attest`, `validate`; formats `md`, `json`, `sarif
 - **Honest mapping.** OWASP ASI controls are `maps`; anything borrowed (OWASP APTS, EU AI Act art. 12) is `adapted`. No conformance claimed.
 - **Tested contracts.** Exit codes, SARIF, Action YAML and every fixture's verdict, on Python 3.10–3.12.
 
-Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md) · Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+## FAQ
+
+**Does it read my secrets?** No. It looks at the *names* of environment variables and headers (`GITHUB_TOKEN`, `Authorization`) to know a credential is in play; values are never read, logged or hashed.
+
+**Does it work without the manifest?** Yes: `scan` without `agent-assurance.yaml` reports the observed blast radius and a "Sources scanned" table. Add the manifest to turn reach into a promise (AA-002).
+
+**What about our private MCP servers?** They come out `UNKNOWN`: scored conservatively, and a promise cannot be called kept over them. Add them to your [organisation policy](docs/how-it-works.md#organisation-policy) catalogue — one entry with its source — and they are classified like any other.
+
+**Is the risk score "AI"?** No. It is a table of weights in one file, every point has a reason, and the report shows the sum. Same input, same number, forever.
+
+**Can it stop the agent at runtime?** No, by design. It checks what the repo says the agent can do — at edit time, in the PR, at release. Runtime enforcement is a different product.
+
+Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md) · Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md) · Good first issues: [`label:good first issue`](https://github.com/kunko-ai-labs/agent-assurance/labels/good%20first%20issue)
 
 ## License
 

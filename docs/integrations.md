@@ -35,7 +35,7 @@ permissions:
 
 steps:
   - uses: actions/checkout@v4
-  - uses: kunko-ai-labs/agent-assurance@v0.5
+  - uses: kunko-ai-labs/agent-assurance@v0.5   # better: pin the commit SHA and let Dependabot bump it
     with:
       mode: diff             # on pull_request: what did this change do? (comment + gate)
       # mode: scan           # on push: observe + verify, SARIF to the Security tab
@@ -98,7 +98,7 @@ permissions:
   id-token: write
   attestations: write
 steps:
-  - uses: kunko-ai-labs/agent-assurance@v0.5
+  - uses: kunko-ai-labs/agent-assurance@v0.5   # better: pin the commit SHA and let Dependabot bump it
     with:
       mode: scan
       attest: sign          # 'write' = unsigned JSON artifact only

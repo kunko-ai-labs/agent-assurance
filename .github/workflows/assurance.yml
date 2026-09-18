@@ -16,7 +16,7 @@ jobs:
     name: Medium-risk agent (must PASS)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run Agent Assurance
         uses: ./
         with:
@@ -28,7 +28,7 @@ jobs:
     name: High-risk agent (must PASS with fail-on=fail, BLOCK with fail-on=review)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: fail-on=fail lets REVIEW through
         uses: ./
         with:
@@ -53,7 +53,7 @@ jobs:
     name: Dangerous agent (must BLOCK)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run Agent Assurance (expected to fail)
         id: gate
         continue-on-error: true
@@ -81,7 +81,7 @@ jobs:
           print("SARIF ok:", uri, r["level"])
           PY
       - name: Upload SARIF artifact (inspectable from the run page)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: aa-sarif
           path: aa.sarif
@@ -94,7 +94,7 @@ jobs:
       id-token: write        # Sigstore signing
       attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run Agent Assurance (scan)
         uses: ./
         with:
@@ -129,7 +129,7 @@ jobs:
     name: scan — promise broken (must BLOCK)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run Agent Assurance (scan, expected to fail)
         id: gate
         continue-on-error: true
@@ -159,7 +159,7 @@ jobs:
     name: scan — Claude Code permissions within declared autonomy (must PASS)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./
         with:
           mode: scan
@@ -171,7 +171,7 @@ jobs:
     name: scan — allow Bash(*) with declared L2 (must BLOCK)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: gate
         continue-on-error: true
         uses: ./
@@ -189,7 +189,7 @@ jobs:
     name: scan — organisation policy (own catalogue, stricter gate; must PASS with fail-on=fail)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./
         with:
           mode: scan
@@ -203,7 +203,7 @@ jobs:
     name: scan — Codex config.toml + serialized tool definitions (must BLOCK on the token, review the guess)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: gate
         continue-on-error: true
         uses: ./

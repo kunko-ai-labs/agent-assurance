@@ -1,0 +1,66 @@
+name: Wrong verdict
+description: The tool said PASS / REVIEW / FAIL and you think it should have said something else.
+title: "verdict: "
+labels: ["wrong-verdict", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most useful report we get. A wrong verdict means the model is wrong, and the model is public — so the fix is too. Please include the smallest configuration that shows it.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`agent-assurance --version`"
+      placeholder: "agent-assurance 0.5.2"
+    validations:
+      required: true
+  - type: dropdown
+    id: direction
+    attributes:
+      label: Direction
+      options:
+        - Too strict (FAIL/REVIEW on something acceptable)
+        - Too lenient (PASS/REVIEW on something that should fail)
+        - Wrong class or system (e.g. read classified as write)
+        - Wrong location (file:line points somewhere else)
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Observed configuration
+      description: The relevant part of `.mcp.json`, `.claude/settings.json`, `.codex/config.toml`, tool definitions… Redact values, keep names.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: manifest
+    attributes:
+      label: Declared manifest (if any)
+      description: Your `agent-assurance.yaml`, or "none".
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What the tool said
+      description: "`agent-assurance scan . --format json` (or the markdown). Include the `Sources scanned` table."
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What it should have said, and why
+      description: Which rule in [docs/how-it-works.md](https://github.com/kunko-ai-labs/agent-assurance/blob/main/docs/how-it-works.md) do you think is wrong or missing?
+    validations:
+      required: true
+  - type: checkboxes
+    id: policy
+    attributes:
+      label: Policy
+      options:
+        - label: No organisation policy file was active (or I have attached it above)
+          required: true

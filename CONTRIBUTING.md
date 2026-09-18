@@ -13,6 +13,12 @@
 
 Launch material (video, composition, share copy) is **not** in this repo; the video is attached to the release.
 
+## Issues and pull requests
+
+Issues use the forms under `.github/ISSUE_TEMPLATE/` (wrong verdict, catalogue entry, bug, feature); blank issues are off so every report carries the evidence needed to act on it. Labels: `wrong-verdict`, `catalog`, `bug`, `enhancement`, `docs`, `ci`, plus `needs-triage` until a maintainer answers and `good first issue` for scoped starter tasks. Each open issue has a milestone (the next release) or none (backlog).
+
+PR titles follow `type(scope): summary` (`feat`, `fix`, `docs`, `ci`, `chore`, `test`; scope = `scan`, `aa-001`, `aa-002`, `catalog`, `action`, `card`, `policy`, `readme`…). The template asks how the change was verified; a PR that touches a verdict shows the fixture before and after.
+
 ## Branches
 
 - `main` — releasable at all times. Only merges from `develop` (or hotfixes). Every release is a tag `vX.Y.Z` plus a moving `vX.Y` for the Action.

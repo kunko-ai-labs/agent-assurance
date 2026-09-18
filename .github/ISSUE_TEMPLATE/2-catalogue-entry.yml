@@ -1,0 +1,52 @@
+name: Catalogue entry (MCP server)
+description: A server came out UNKNOWN and you know what it can do.
+title: "catalog: <server name>"
+labels: ["catalog", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The catalogue (`src/agent_assurance/scan/catalog.py`) maps well-known MCP servers to capability classes. Every entry cites its source. Fill this in and we (or you, in a PR) add it.
+  - type: input
+    id: package
+    attributes:
+      label: Package or command
+      description: Exactly as it appears in `args` / `command` / `url`.
+      placeholder: "@modelcontextprotocol/server-github"
+    validations:
+      required: true
+  - type: input
+    id: aliases
+    attributes:
+      label: Common config names
+      placeholder: "github, gh"
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: Capabilities
+      description: One line per class the server exposes — read / write / delete / execute / external_send / financial — with the tool names that justify it and whether any is irreversible.
+      placeholder: |
+        read      — get_file_contents, search_code
+        write     — create_or_update_file, create_issue, push_files
+    validations:
+      required: true
+  - type: input
+    id: data
+    attributes:
+      label: Data classes reached
+      placeholder: "internal, pii, credential, financial, health, public"
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: URL of the README / tool list you read, and its date.
+      placeholder: "https://github.com/github/github-mcp-server#tools (2026-09-18)"
+    validations:
+      required: true
+  - type: checkboxes
+    id: rule
+    attributes:
+      label: Classification rule
+      options:
+        - label: When unsure between two classes I chose the wider one and said why in the source field
+          required: true

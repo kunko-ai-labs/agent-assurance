@@ -11,7 +11,7 @@ No dashboard, no backend, no LLM in the verdict, no network calls, nothing execu
 ![A PR adds a GitHub MCP server to a read-only agent and gets blocked](docs/demo.gif)
 
 ```bash
-pipx install git+https://github.com/kunko-ai-labs/agent-assurance@v0.5.0   # PyPI: coming with v0.5.1
+pipx install agent-assurance
 agent-assurance scan .        # what does this repo let the agent do — and does it match the promise?
 ```
 

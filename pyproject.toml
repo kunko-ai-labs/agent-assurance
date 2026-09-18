@@ -1,6 +1,6 @@
 [project]
 name = "agent-assurance"
-version = "0.5.0"
+version = "0.5.1"
 description = "Transparent, framework-agnostic assurance checks for AI agents, mapped to OWASP Agentic security standards."
 readme = "README.md"
 requires-python = ">=3.10"

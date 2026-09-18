@@ -1,5 +1,7 @@
 # Agent Assurance
 
+[![CI](https://github.com/kunko-ai-labs/agent-assurance/actions/workflows/ci.yml/badge.svg)](https://github.com/kunko-ai-labs/agent-assurance/actions/workflows/ci.yml) [![Self-demo: the gate blocks what it should](https://github.com/kunko-ai-labs/agent-assurance/actions/workflows/assurance.yml/badge.svg)](https://github.com/kunko-ai-labs/agent-assurance/actions/workflows/assurance.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 **Declare what your agent may do. Verify it on every edit, every PR, every release.**
 
 Your repo *promises* what an AI agent is allowed to do (`agent-assurance.yaml`: read the CRM, no external send, a human approves actions). Agent Assurance *observes* what the configuration actually grants — MCP servers, Claude Code permissions, tool definitions — and fails the change when the promise is broken, pointing at the file and line that broke it. Then it leaves a signed record of what the agent could do, and when.

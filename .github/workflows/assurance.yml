@@ -89,6 +89,10 @@ jobs:
   scan-promise-kept:
     name: scan — promise kept (must PASS) + attestation written
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write        # Sigstore signing
+      attestations: write
     steps:
       - uses: actions/checkout@v4
       - name: Run Agent Assurance (scan)
@@ -98,7 +102,7 @@ jobs:
           directory: examples/repos/mcp-promise-kept
           manifest: examples/repos/mcp-promise-kept/agent-assurance.yaml
           fail-on: review   # a kept promise has nothing to review either
-          attest: write     # 'sign' needs a public repo or GHE; asserted below
+          attest: sign      # in-toto statement, signed with Sigstore (public repo)
       - name: Assert the attestation is a valid in-toto statement about the right files
         run: |
           python3 - <<'PY'
@@ -112,6 +116,14 @@ jobs:
           assert s["predicate"]["git"]["commit"]
           print("attestation ok:", names, s["predicate"]["git"]["commit"][:7])
           PY
+      - name: Verify the signed attestation the way a third party would
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh attestation verify examples/repos/mcp-promise-kept/.mcp.json \
+            -R "$GITHUB_REPOSITORY" \
+            --predicate-type https://github.com/kunko-ai-labs/agent-assurance/attestation/v1
 
   scan-promise-broken:
     name: scan — promise broken (must BLOCK)

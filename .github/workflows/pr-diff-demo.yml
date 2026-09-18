@@ -21,5 +21,6 @@ jobs:
           mode: diff
           directory: examples/demo/analytics-helper
           manifest: examples/demo/analytics-helper/agent-assurance.yaml
-          comment: "true"
+          # Fork PRs get a read-only token: no comment there, the gate still runs.
+          comment: ${{ github.event.pull_request.head.repo.fork && 'false' || 'true' }}
           fail-on-delta: "true"

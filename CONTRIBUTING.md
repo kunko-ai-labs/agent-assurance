@@ -19,6 +19,10 @@ Issues use the forms under `.github/ISSUE_TEMPLATE/` (wrong verdict, catalogue e
 
 PR titles follow `type(scope): summary` (`feat`, `fix`, `docs`, `ci`, `chore`, `test`; scope = `scan`, `aa-001`, `aa-002`, `catalog`, `action`, `card`, `policy`, `readme`…). The template asks how the change was verified; a PR that touches a verdict shows the fixture before and after.
 
+## Pull requests from forks
+
+Welcome. A fork PR runs with a read-only token, so two things behave differently and that is expected: the attestation is written but not Sigstore-signed, and the diff demo does not post a comment. A maintainer approves the first CI run of a new contributor (GitHub's default); after that, runs start on their own.
+
 ## Branches
 
 - `main` — releasable at all times. Only merges from `develop` (or hotfixes). Every release is a tag `vX.Y.Z` plus a moving `vX.Y` for the Action.

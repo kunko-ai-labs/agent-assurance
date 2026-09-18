@@ -105,7 +105,9 @@ jobs:
           directory: examples/repos/mcp-promise-kept
           manifest: examples/repos/mcp-promise-kept/agent-assurance.yaml
           fail-on: review   # a kept promise has nothing to review either
-          attest: sign      # in-toto statement, signed with Sigstore (public repo)
+          # Sigstore signing needs id-token: write, which fork PRs never get;
+          # they still write the unsigned statement and assert its shape.
+          attest: ${{ github.event.pull_request.head.repo.fork && 'write' || 'sign' }}
       - name: Assert the attestation is a valid in-toto statement about the right files
         run: |
           python3 - <<'PY'
@@ -120,7 +122,7 @@ jobs:
           print("attestation ok:", names, s["predicate"]["git"]["commit"][:7])
           PY
       - name: Verify the signed attestation the way a third party would
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: ${{ !github.event.pull_request.head.repo.fork }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

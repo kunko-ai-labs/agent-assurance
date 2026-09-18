@@ -119,7 +119,8 @@ runs:
         if [ "$code" -ne 0 ]; then echo "AA_FAILED=1" >> "$GITHUB_ENV"; fi
 
     - name: "Comment on the pull request (mode: diff)"
-      if: ${{ inputs.mode == 'diff' && inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      # Skipped on pull requests from forks: their token cannot write comments.
+      if: ${{ inputs.mode == 'diff' && inputs.comment == 'true' && github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}

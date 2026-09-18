@@ -32,7 +32,7 @@ _FORMATS = {
     "markdown": lambda report, _path: reports.to_markdown(report),
     "json": lambda report, _path: reports.to_json(report),
     "sarif": lambda report, path: reports.to_sarif(report, manifest_path=path),
-    "html": lambda report, _path: reports.to_html(report),
+    "html": lambda report, _path, theme="auto": reports.to_html(report, theme=theme),
 }
 
 # Exit codes are the contract the GitHub Action relies on.
@@ -53,7 +53,10 @@ def _load(path: str) -> Manifest | None:
 
 
 def _emit(report: engine.AssuranceReport, args: argparse.Namespace, anchor: str) -> None:
-    output = _FORMATS[args.format](report, anchor)
+    if args.format == "html":
+        output = reports.to_html(report, theme=getattr(args, "theme", "auto"))
+    else:
+        output = _FORMATS[args.format](report, anchor)
     if args.output:
         with open(args.output, "w", encoding="utf-8") as fh:
             fh.write(output)
@@ -210,7 +213,7 @@ def cmd_diff(args: argparse.Namespace) -> int:
     elif args.format == "json":
         output = json.dumps(diff.to_dict(result), indent=2, ensure_ascii=False)
     elif args.format == "html":
-        output = diff.to_html(result)
+        output = diff.to_html(result, theme=getattr(args, "theme", "auto"))
     else:
         anchor = next((s.path for s in result.head.sources if s.supported), "agent-assurance.yaml")
         output = reports.to_sarif(result.head, anchor, result.baseline_states())
@@ -242,6 +245,7 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("check", help="check name (e.g. blast-radius) or 'all'")
     pc.add_argument("manifest")
     pc.add_argument("--format", choices=list(_FORMATS.keys()), default="md")
+    pc.add_argument("--theme", choices=["auto", "dark", "light"], default="auto", help="html only")
     pc.add_argument("--output", "-o", default=None, help="write report to a file")
     pc.add_argument("--policy", default=None, help="organisation policy file (default: agent-assurance.policy.yaml next to the manifest)")
     pc.add_argument(
@@ -261,6 +265,7 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--manifest", "-m", default=None, help="declared manifest (the promise)")
     ps.add_argument("--check", default="all", help="check id/alias or 'all'")
     ps.add_argument("--format", choices=list(_FORMATS.keys()), default="md")
+    ps.add_argument("--theme", choices=["auto", "dark", "light"], default="auto", help="html only")
     ps.add_argument("--output", "-o", default=None, help="write report to a file")
     ps.add_argument("--fail-on", choices=["fail", "review"], default="fail")
     ps.add_argument("--policy", default=None, help="organisation policy file (default: <dir>/agent-assurance.policy.yaml)")
@@ -280,6 +285,7 @@ def build_parser() -> argparse.ArgumentParser:
     pd.add_argument("head")
     pd.add_argument("--manifest", "-m", default=None, help="declared manifest to hold both sides against (default: each side's own)")
     pd.add_argument("--format", choices=list(_FORMATS.keys()), default="md")
+    pd.add_argument("--theme", choices=["auto", "dark", "light"], default="auto", help="html only")
     pd.add_argument("--output", "-o", default=None)
     pd.add_argument("--fail-on", choices=["fail", "review"], default="fail", help="gate on the head verdict")
     pd.add_argument("--fail-on-delta", action="store_true", help="also gate when reach grows, the band rises or the promise breaks")

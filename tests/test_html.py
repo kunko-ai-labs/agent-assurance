@@ -48,3 +48,12 @@ def test_check_html_on_manifest_alone(tmp_path):
     html = tmp_path / "c.html"
     assert cli.main(["check", "all", str(REPOS.parent / "dangerous-agent.yaml"), "--format", "html", "-o", str(html)]) == cli.EXIT_GATE
     assert "CRITICAL" in html.read_text(encoding="utf-8")
+
+
+def test_card_theme_flag(tmp_path):
+    html = tmp_path / "c.html"
+    cli.main(["scan", KEPT, "--format", "html", "--theme", "dark", "-o", str(html)])
+    text = html.read_text(encoding="utf-8")
+    assert '<html lang="en" data-theme="dark">' in text and "prefers-color-scheme: dark" in text
+    cli.main(["scan", KEPT, "--format", "html", "-o", str(html)])
+    assert "data-theme" not in html.read_text(encoding="utf-8").split("<head>")[0]  # auto follows the viewer

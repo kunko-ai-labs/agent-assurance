@@ -227,24 +227,24 @@ def to_dict(d: DiffReport) -> dict:
     }
 
 
-def to_html(d: DiffReport) -> str:
+def to_html(d: DiffReport, theme: str = "auto") -> str:
     """Capability card of the head side, with the delta on top."""
     from html import escape as _e
 
     from .reports.html import _md_inline
     from .reports.html import to_html as card
 
-    head = card(d.head)
+    head = card(d.head, theme=theme)
     if d.promise_regressed:
-        title, color = "PROMISE BROKEN BY THIS CHANGE", "#cf222e"
+        title, color = "PROMISE BROKEN BY THIS CHANGE", "var(--fail)"
     elif d.promise_stretched or d.band_up:
-        title, color = "REACH GREW — REVIEW", "#9a6700"
+        title, color = "REACH GREW — REVIEW", "var(--review)"
     elif not d.has_delta:
-        title, color = "NO CHANGE TO WHAT THE AGENT CAN DO", "#1a7f37"
+        title, color = "NO CHANGE TO WHAT THE AGENT CAN DO", "var(--pass)"
     else:
-        title, color = "REACH CHANGED, PROMISE KEPT", "#1a7f37"
-    parts = [f'<section style="border-left:4px solid {color};padding:8px 14px;margin-bottom:20px;background:#f6f8fa">']
-    parts.append(f'<div style="font-weight:700;color:{color}">{title}</div>')
+        title, color = "REACH CHANGED, PROMISE KEPT", "var(--pass)"
+    parts = [f'<section class="delta" style="--accent:{color}">']
+    parts.append(f'<div class="title">{title}</div>')
     parts.append(f'<div class="muted">Blast radius {_e(d.band_from)} → <strong>{_e(d.band_to)}</strong>'
                  + (f' · Promise {_e(d.promise_from.value if d.promise_from else "none")} → <strong>{_e(d.promise_to.value)}</strong>' if d.promise_to else "") + "</div>")
     if d.newly_broken:

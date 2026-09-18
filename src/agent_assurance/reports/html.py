@@ -16,22 +16,30 @@ from .. import __version__
 from ..checks.base import Status
 from ..engine import AssuranceReport
 
-_COLOR = {Status.PASS: "#1a7f37", Status.REVIEW: "#9a6700", Status.FAIL: "#cf222e"}
 _LABEL = {Status.PASS: "PASS", Status.REVIEW: "REVIEW", Status.FAIL: "FAIL"}
 
 _CSS = """
-:root{color-scheme:light}
-body{margin:0;padding:24px 16px;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#1f2328;background:#f6f8fa}
-main{max-width:880px;margin:0 auto;background:#fff;border:1px solid #d0d7de;border-radius:8px;padding:24px 28px}
-h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 8px;border-bottom:1px solid #d0d7de;padding-bottom:4px}
-.meta{color:#57606a;font-size:13px}.badge{display:inline-block;padding:4px 12px;border-radius:999px;color:#fff;font-weight:700;letter-spacing:.3px}
-table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #eaeef2;vertical-align:top}
-th{color:#57606a;font-weight:600}code{background:#f6f8fa;padding:1px 4px;border-radius:4px;font-size:12.5px}
-.k{font-weight:600}.muted{color:#57606a}.pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:12px;border:1px solid #d0d7de}
-.pill.fail{border-color:#cf222e;color:#cf222e}.pill.review{border-color:#9a6700;color:#9a6700}.pill.pass{border-color:#1a7f37;color:#1a7f37}
-ul{padding-left:20px;margin:6px 0}footer{margin-top:28px;color:#57606a;font-size:12px}
+:root{--bg:#f6f8fa;--panel:#fff;--fg:#1f2328;--muted:#57606a;--line:#d0d7de;--row:#eaeef2;--code:#f6f8fa;--link:#0969da;
+      --pass:#1a7f37;--review:#9a6700;--fail:#cf222e;color-scheme:light dark}
+:root[data-theme="dark"]{--bg:#0d1117;--panel:#161b22;--fg:#e6edf3;--muted:#8b949e;--line:#30363d;--row:#21262d;--code:#0d1117;--link:#58a6ff;
+      --pass:#3fb950;--review:#d29922;--fail:#f85149}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1117;--panel:#161b22;--fg:#e6edf3;--muted:#8b949e;--line:#30363d;--row:#21262d;--code:#0d1117;--link:#58a6ff;
+      --pass:#3fb950;--review:#d29922;--fail:#f85149}}
+body{margin:0;padding:24px 16px;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--fg);background:var(--bg)}
+main{max-width:880px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:24px 28px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+a{color:var(--link)}.meta{color:var(--muted);font-size:13px}
+.badge{display:inline-block;padding:4px 12px;border-radius:999px;color:#fff;font-weight:700;letter-spacing:.3px}
+.badge.pass{background:var(--pass)}.badge.review{background:var(--review)}.badge.fail{background:var(--fail)}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--row);vertical-align:top}
+th{color:var(--muted);font-weight:600}code{background:var(--code);padding:1px 4px;border-radius:4px;font-size:12.5px}
+.k{font-weight:600}.muted{color:var(--muted)}.pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:12px;border:1px solid var(--line)}
+.pill.fail{border-color:var(--fail);color:var(--fail)}.pill.review{border-color:var(--review);color:var(--review)}.pill.pass{border-color:var(--pass);color:var(--pass)}
+ul{padding-left:20px;margin:6px 0}footer{margin-top:28px;color:var(--muted);font-size:12px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:12px 0}
-.card{border:1px solid #d0d7de;border-radius:6px;padding:10px 12px}.card .v{font-size:20px;font-weight:700}
+.card{border:1px solid var(--line);border-radius:6px;padding:10px 12px}.card .v{font-size:20px;font-weight:700}
+section.delta{border-left:4px solid var(--accent);padding:8px 14px;margin-bottom:20px;background:var(--code)}
+section.delta .title{font-weight:700;color:var(--accent)}
 """
 
 
@@ -39,7 +47,8 @@ def _status_pill(s: Status) -> str:
     return f'<span class="pill {s.value.lower()}">{_LABEL[s]}</span>'
 
 
-def to_html(report: AssuranceReport, generated_at: str | None = None) -> str:
+def to_html(report: AssuranceReport, generated_at: str | None = None, theme: str = "auto") -> str:
+    """`theme`: "auto" follows the viewer's system setting; "dark" / "light" force one."""
     m = report.manifest
     v = report.verdict
     aa1 = next((r for r in report.results if r.check_id == "AA-001"), None)
@@ -47,12 +56,13 @@ def to_html(report: AssuranceReport, generated_at: str | None = None) -> str:
     generated_at = generated_at or _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
 
     out: list[str] = []
-    out.append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">")
+    attr = f' data-theme="{theme}"' if theme in ("dark", "light") else ""
+    out.append(f"<!doctype html><html lang=\"en\"{attr}><head><meta charset=\"utf-8\">")
     out.append('<meta name="viewport" content="width=device-width,initial-scale=1">')
     out.append(f"<title>Agent capability card — {_e(m.agent.name)}</title><style>{_CSS}</style></head><body><main>")
 
     # Header
-    out.append(f'<span class="badge" style="background:{_COLOR[v]}">{_LABEL[v]}</span>')
+    out.append(f'<span class="badge {v.value.lower()}">{_LABEL[v]}</span>')
     out.append(f"<h1>{_e(m.agent.name)} <span class=\"meta\">v{_e(m.agent.version)}</span></h1>")
     fw = m.framework.name or "unknown"
     mode = (

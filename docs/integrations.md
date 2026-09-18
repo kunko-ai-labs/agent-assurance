@@ -1,5 +1,14 @@
 # Integrations
 
+## Install
+
+```bash
+pipx install git+https://github.com/kunko-ai-labs/agent-assurance@v0.5.0   # pinned to a release tag
+pipx install "agent-assurance[mcp]"                                          # from PyPI, once v0.5.1 is out
+```
+
+Releases ship a wheel and an sdist with Sigstore build provenance (`gh attestation verify agent_assurance-*.whl -R kunko-ai-labs/agent-assurance`).
+
 Every way to run Agent Assurance: CLI, GitHub Action, pre-commit, MCP server, Claude Code hook, Python library, and the evidence (attestation) flow.
 
 ## CLI

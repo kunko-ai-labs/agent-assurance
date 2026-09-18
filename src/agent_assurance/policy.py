@@ -154,7 +154,10 @@ def reset() -> None:
 def load(path: str) -> Policy:
     with open(path, "rb") as fh:
         raw_bytes = fh.read()
-    raw = yaml.safe_load(raw_bytes) or {}
+    try:
+        raw = yaml.safe_load(raw_bytes) or {}
+    except yaml.YAMLError as exc:
+        raise ManifestError(f"{path}: invalid policy YAML\n{exc}") from exc
     if not isinstance(raw, dict):
         raise ManifestError(f"{path}: policy root must be a mapping")
     if raw.get("apiVersion", API_VERSION) != API_VERSION:

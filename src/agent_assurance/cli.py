@@ -1,7 +1,7 @@
 """agent-assurance CLI.
 
 Commands:
-  agent-assurance validate <manifest>
+  agent-assurance validate <manifest|policy> [--policy FILE]
   agent-assurance check [blast-radius|all] <manifest> [--format md|json|sarif] [--output FILE]
   agent-assurance scan <dir> [--manifest FILE] [--format ...] [--output FILE]
   agent-assurance diff <base-dir> <head-dir> [--fail-on-delta] [--format ...]
@@ -17,6 +17,8 @@ import argparse
 import json
 import os
 import sys
+
+import yaml
 
 from . import __version__, attest, diff, engine, policy, reports
 from .checks import CHECK_ALIASES
@@ -99,11 +101,88 @@ def _apply_policy(args: argparse.Namespace, directory: str | None = None) -> int
     return EXIT_OK
 
 
+def _is_policy_file(path: str) -> bool:
+    """A policy file is recognised by its apiVersion, not its name."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = yaml.safe_load(fh)
+    except (FileNotFoundError, yaml.YAMLError):
+        return False
+    return isinstance(raw, dict) and raw.get("apiVersion") == policy.API_VERSION
+
+
+def _policy_override_summary(pol: policy.Policy) -> str:
+    """One line naming what a policy changes relative to the built-in model."""
+    default = policy.Policy()
+
+    def _changed_leaves(new: dict, old: dict, prefix: str = "") -> list[str]:
+        leaves: list[str] = []
+        for key, value in new.items():
+            previous = old.get(key)
+            if isinstance(value, dict) and isinstance(previous, dict):
+                leaves.extend(_changed_leaves(value, previous, f"{prefix}{key}."))
+            elif value != previous:
+                leaves.append(f"{prefix}{key}={value!r}")
+        return leaves
+
+    parts: list[str] = []
+    weight_leaves = _changed_leaves(pol.weights.model_dump(), default.weights.model_dump())
+    if weight_leaves:
+        shown = ", ".join(weight_leaves[:4])
+        if len(weight_leaves) > 4:
+            shown += f", +{len(weight_leaves) - 4} more"
+        parts.append(f"weights ({shown})")
+    band_leaves = _changed_leaves(pol.bands.model_dump(), default.bands.model_dump())
+    if band_leaves:
+        parts.append(f"bands ({', '.join(band_leaves)})")
+    if pol.gate != default.gate:
+        parts.append(f"gate (review={pol.gate.review_bands}, fail={pol.gate.fail_bands})")
+    if pol.promise != default.promise:
+        parts.append("promise (breaking access/data classes)")
+    if pol.read_only_commands:
+        parts.append(f"read_only_commands (+{len(pol.read_only_commands)})")
+    if pol.catalog:
+        parts.append(f"catalog (+{len(pol.catalog)} entries)")
+    if pol.tool_definition_files:
+        parts.append(f"tool_definition_files (+{len(pol.tool_definition_files)})")
+    return ", ".join(parts) if parts else "none — every value equals the built-in default"
+
+
+def _validate_policy(path: str) -> int:
+    try:
+        pol = policy.load(path)
+    except FileNotFoundError:
+        print(f"error: policy not found: {path}", file=sys.stderr)
+        return EXIT_USAGE
+    except ManifestError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    print(f"ok: {path} is a valid {policy.API_VERSION} policy")
+    print(f"    name={pol.name} sha256={pol.sha256}")
+    print(f"    overrides: {_policy_override_summary(pol)}")
+    return EXIT_OK
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
-    m = _load(args.manifest)
+    if args.policy and args.file:
+        print("error: pass a file or --policy, not both", file=sys.stderr)
+        return EXIT_USAGE
+    target = args.policy or args.file
+    if not target:
+        print(
+            "error: nothing to validate: pass a manifest, a policy file, or --policy PATH",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+    if args.policy or _is_policy_file(target):
+        return _validate_policy(target)
+    if not os.path.isfile(target):
+        print(f"error: file not found: {target}", file=sys.stderr)
+        return EXIT_USAGE
+    m = _load(target)
     if m is None:
         return EXIT_USAGE
-    print(f"ok: {args.manifest} is a valid agent-assurance/v1 manifest")
+    print(f"ok: {target} is a valid agent-assurance/v1 manifest")
     print(f"    agent={m.agent.name} v{m.agent.version} autonomy=L{m.autonomy} "
           f"tools={len(m.tools)} data={len(m.data)}")
     return EXIT_OK
@@ -237,8 +316,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"agent-assurance {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
-    pv = sub.add_parser("validate", help="validate a manifest")
-    pv.add_argument("manifest")
+    pv = sub.add_parser("validate", help="validate a manifest or a policy file")
+    pv.add_argument(
+        "file",
+        nargs="?",
+        default=None,
+        help="manifest (agent-assurance/v1) or policy file; a policy is recognised by its apiVersion",
+    )
+    pv.add_argument("--policy", default=None, help="validate this policy file explicitly")
     pv.set_defaults(func=cmd_validate)
 
     pc = sub.add_parser("check", help="run assurance checks")

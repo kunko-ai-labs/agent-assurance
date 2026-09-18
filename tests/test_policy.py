@@ -91,3 +91,68 @@ def test_policy_does_not_leak_between_runs(tmp_path):
     cli.main(["scan", str(ORG), "--format", "json", "-o", str(out)])
     cli.main(["scan", str(KEPT), "--format", "json", "-o", str(out)])
     assert json.loads(out.read_text(encoding="utf-8"))["policy"] is None
+
+
+def test_validate_policy_reports_name_sha256_and_overrides(tmp_path, capsys):
+    pol = tmp_path / "p.yaml"
+    pol.write_text(
+        "apiVersion: agent-assurance/policy/v1\n"
+        "name: acme-corp\n"
+        "weights:\n  tools: {read: 10}\n"
+        "read_only_commands: [poetry run pytest]\n",
+        encoding="utf-8",
+    )
+    assert cli.main(["validate", "--policy", str(pol)]) == cli.EXIT_OK
+    out = capsys.readouterr().out
+    assert "valid agent-assurance/policy/v1 policy" in out
+    assert "name=acme-corp" in out
+    assert "sha256=" in out
+    assert "weights (tools.read=10)" in out
+    assert "read_only_commands (+1)" in out
+
+
+def test_validate_detects_a_policy_by_api_version(tmp_path, capsys):
+    pol = tmp_path / "not-named-policy.yaml"
+    pol.write_text("apiVersion: agent-assurance/policy/v1\nname: detected\n", encoding="utf-8")
+    assert cli.main(["validate", str(pol)]) == cli.EXIT_OK
+    assert "detected" in capsys.readouterr().out
+
+
+def test_validate_policy_with_no_overrides_says_so(tmp_path, capsys):
+    pol = tmp_path / "p.yaml"
+    pol.write_text("apiVersion: agent-assurance/policy/v1\nname: empty\n", encoding="utf-8")
+    assert cli.main(["validate", "--policy", str(pol)]) == cli.EXIT_OK
+    assert "every value equals the built-in default" in capsys.readouterr().out
+
+
+def test_validate_command_rejects_invalid_policies(tmp_path, capsys):
+    bad = tmp_path / "p.yaml"
+    bad.write_text("apiVersion: agent-assurance/policy/v9\n", encoding="utf-8")
+    assert cli.main(["validate", "--policy", str(bad)]) == cli.EXIT_USAGE
+    assert "unsupported policy apiVersion" in capsys.readouterr().err
+
+    bad.write_text(
+        "apiVersion: agent-assurance/policy/v1\nweights: {tools: {read: many}}\n",
+        encoding="utf-8",
+    )
+    assert cli.main(["validate", "--policy", str(bad)]) == cli.EXIT_USAGE
+    assert "invalid policy" in capsys.readouterr().err
+
+    bad.write_text("apiVersion: agent-assurance/policy/v1\nname: [broken\n", encoding="utf-8")
+    assert cli.main(["validate", "--policy", str(bad)]) == cli.EXIT_USAGE
+    assert "invalid policy YAML" in capsys.readouterr().err
+
+    assert cli.main(["validate", "--policy", str(tmp_path / "missing.yaml")]) == cli.EXIT_USAGE
+
+
+def test_validate_still_validates_a_manifest_and_requires_a_target(tmp_path, capsys):
+    manifest = KEPT / "agent-assurance.yaml"
+    assert cli.main(["validate", str(manifest)]) == cli.EXIT_OK
+    assert "valid agent-assurance/v1 manifest" in capsys.readouterr().out
+
+    assert cli.main(["validate"]) == cli.EXIT_USAGE
+    assert "nothing to validate" in capsys.readouterr().err
+
+    both = cli.main(["validate", str(manifest), "--policy", str(manifest)])
+    assert both == cli.EXIT_USAGE
+    assert "not both" in capsys.readouterr().err

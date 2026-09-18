@@ -13,11 +13,22 @@
 
 Launch material (video, composition, share copy) is **not** in this repo; the video is attached to the release.
 
-## Issues and pull requests
+## Issues: Epics, User Stories, Bugs, Catalogue entries
 
-Issues use the forms under `.github/ISSUE_TEMPLATE/` (wrong verdict, catalogue entry, bug, feature); blank issues are off so every report carries the evidence needed to act on it. Labels: `wrong-verdict`, `catalog`, `bug`, `enhancement`, `docs`, `ci`, plus `needs-triage` until a maintainer answers and `good first issue` for scoped starter tasks. Each open issue has a milestone (the next release) or none (backlog).
+Templates under `.github/ISSUE_TEMPLATE/` (blank issues are off):
 
-PR titles follow `type(scope): summary` (`feat`, `fix`, `docs`, `ci`, `chore`, `test`; scope = `scan`, `aa-001`, `aa-002`, `catalog`, `action`, `card`, `policy`, `readme`…). The template asks how the change was verified; a PR that touches a verdict shows the fixture before and after.
+| Template | Title | When |
+|---|---|---|
+| 🎯 Epic | `[EP-XXX] Name` | a capability made of several stories, with a product goal and a metric |
+| 📖 User Story | `[US-XXX-YYY] Title` | one scoped change (1–5 days); XXX = epic (000 = backlog), YYY = story |
+| 🐛 Bug Report | `[BUG] Title` | wrong verdict, crash, wrong exit code, integration misbehaving — with severity and a remediation pipeline |
+| 📚 Catalogue entry | `[CATALOG] server` | an MCP server that came out `UNKNOWN`, with its sourced capabilities |
+
+Labels are structured: `type:*` (story, bug, catalog, docs, ci) · `priority:*` (critical → low) · `status:*` (todo → done) · `severity:sev0..3` (bugs) · `area:*` (scan, check, report, integration, policy, docs, ci) · `pillar:*`, `persona:*`, `bet:*` (epics) · `good first issue`. Every story and bug belongs to a milestone (next release) or to the backlog.
+
+## Pull requests
+
+Title: **`type(scope): [ID] Description`** — `feat(scan): [US-001-002] read Windsurf mcp_config.json`, `fix(aa-002): [BUG] scoped Bash grants are review, not broken`. The template asks how the change was verified; a PR that changes a verdict shows the fixture before and after. Squash-merged; the PR title becomes the commit.
 
 ## Pull requests from forks
 

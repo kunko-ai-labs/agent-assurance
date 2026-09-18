@@ -1,29 +1,54 @@
-<!-- Title: `type(scope): summary` — e.g. `feat(scan): read Windsurf mcp_config.json`, `fix(aa-002): scoped Bash grants are review, not broken`, `docs(readme): …` -->
+## ⚠️ Title format (required)
 
-## Summary
+**`type(scope): [ID] Description`** — type ∈ `feat` `fix` `docs` `ci` `chore` `test` `refactor`; scope ∈ `scan` `aa-001` `aa-002` `catalog` `report` `card` `sarif` `attest` `action` `mcp` `hook` `policy` `cli` `readme`; ID = `US-XXX-YYY`, `BUG`, `CATALOG` or `EP-XXX`.
 
-<!-- What changes and why, in a few lines. Link the issue: "Closes #NN". -->
+✅ `feat(scan): [US-001-002] read Windsurf mcp_config.json` · `fix(aa-002): [BUG] scoped Bash grants are review, not broken` · `docs(readme): [US-000-004] FAQ`
+❌ `Update cli.py` · `fix: stuff` · `[US-001-002] Windsurf`
+
+---
+
+## 📋 Description
+
+<!-- What changes and why. One paragraph. -->
+
+## 🔗 Related issue
 
 Closes #
 
-## Type
+## 📝 Type of change
 
-- [ ] Bug fix
-- [ ] New observed source / catalogue entry / check
-- [ ] Report format or integration (Action, MCP, hook, pre-commit)
-- [ ] Docs
-- [ ] CI / release / supply chain
-- [ ] **Breaking change** (exit codes, JSON/SARIF shape, manifest or policy schema) — say what and why below
+- [ ] 🐛 Bug fix
+- [ ] ✨ New observed source / catalogue entry / check
+- [ ] 📤 Report format or integration (Action, MCP, hook, pre-commit, SARIF, card, attestation)
+- [ ] 📚 Documentation
+- [ ] 🔧 CI / release / supply chain
+- [ ] 💥 **Breaking change** — exit codes, JSON/SARIF shape, manifest or policy schema (explain below)
 
-## How this was verified
+## 🧪 How this was verified
 
-<!-- Commands you ran and what you saw. For a verdict change: the fixture before/after. For a catalogue entry: the source you read. -->
+<!-- Commands run and what you saw. A verdict change shows the fixture before/after; a catalogue entry names the source. -->
 
-## House rules
+```bash
+ruff check src tests && pytest -q
+```
 
-- [ ] `ruff check src tests && pytest -q` pass locally
-- [ ] No LLM in the verdict; nothing executed; no network at scan time; secret values never read
-- [ ] A new scanner / check / catalogue entry ships with a fixture in `examples/repos/`, a test, a job in `.github/workflows/assurance.yml`, and (catalogue) its source
-- [ ] Exit codes `0 / 1 / 2` unchanged
-- [ ] Docs updated (`README.md` only for what a first-time reader needs; detail in `docs/`)
-- [ ] Any new third-party action is pinned by commit SHA
+## ✅ Checklist
+
+- [ ] Lint and tests green locally (3.10 if you can)
+- [ ] New source / check / catalogue entry ships with a fixture in `examples/repos/`, a test, a job in `.github/workflows/assurance.yml`, and (catalogue) its source
+- [ ] Exit codes `0 / 1 / 2` unchanged, or the change is marked breaking
+- [ ] Any new third-party action pinned by commit SHA
+- [ ] Self-review done; no debug output left
+
+## 📄 Documentation
+
+- [ ] `docs/how-it-works.md` updated (model or source changed)
+- [ ] `docs/integrations.md` updated (command, format or integration changed)
+- [ ] `README.md` touched only if a first-time reader needs it
+- [ ] N/A — no user-visible change
+
+## 🔐 House rules
+
+- [ ] No LLM in the verdict
+- [ ] Nothing executed, no network at scan time, secret values never read
+- [ ] A guess (inferred class) never fails a build on its own

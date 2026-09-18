@@ -1,8 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Security vulnerability
+  - name: 🔐 Security vulnerability (private)
     url: https://github.com/kunko-ai-labs/agent-assurance/security/advisories/new
-    about: A way to make the tool execute something, read a secret value, reach the network, or pass what it should flag. Report privately.
-  - name: Documentation
+    about: Anything that makes the tool execute code, read a secret value, reach the network, or PASS what it should flag. Never a public issue.
+  - name: 📚 Documentation
     url: https://github.com/kunko-ai-labs/agent-assurance/tree/main/docs
-    about: How it works, integrations, roadmap, real-world scans.
+    about: How it works, integrations, roadmap, real-world scans, landscape.
+  - name: 📖 CONTRIBUTING — conventions, branches, house rules
+    url: https://github.com/kunko-ai-labs/agent-assurance/blob/main/CONTRIBUTING.md
+    about: Read before opening a PR.

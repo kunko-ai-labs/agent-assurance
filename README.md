@@ -11,11 +11,11 @@ No dashboard, no backend, no LLM in the verdict, no network calls, nothing execu
 ![A PR adds a GitHub MCP server to a read-only agent and gets blocked](docs/demo.gif)
 
 ```bash
-pipx install agent-assurance
+pipx install agent-assurance     # every release ships Sigstore-signed SLSA provenance
 agent-assurance scan .        # what does this repo let the agent do — and does it match the promise?
 ```
 
-▶ [22-second launch video](https://github.com/kunko-ai-labs/agent-assurance/releases/download/v0.5.0/brag.mp4)
+▶ [22-second launch video](https://github.com/kunko-ai-labs/agent-assurance/releases/download/v0.5.2/brag.mp4)
 
 ---
 
@@ -81,7 +81,7 @@ Details, weights and the organisation policy file: [`docs/how-it-works.md`](docs
 permissions: { contents: read, pull-requests: write }
 steps:
   - uses: actions/checkout@v4
-  - uses: kunko-ai-labs/agent-assurance@v0.5
+  - uses: kunko-ai-labs/agent-assurance@v0.5     # or pin the commit SHA of a release (see below)
     with:
       mode: diff                 # on pull_request; use scan on push
       manifest: agent-assurance.yaml
@@ -95,7 +95,7 @@ CLI (`scan`, `diff`, `check`, `attest`, `validate`; formats `md`, `json`, `sarif
 
 ### Running third-party code in your CI — what you should check
 
-- **Pin by commit SHA**, not by tag: `uses: kunko-ai-labs/agent-assurance@<sha> # v0.5.0`. Tags can move; a SHA cannot. Dependabot keeps the comment and the SHA in step. Our own workflows pin every action the same way.
+- **Pin by commit SHA**, not by tag. Tags can move; a SHA cannot. Get the SHA of any release with `gh api repos/kunko-ai-labs/agent-assurance/git/ref/tags/v0.5.2 --jq .object.sha` and write `uses: kunko-ai-labs/agent-assurance@<that sha>  # v0.5.2`; Dependabot keeps the SHA and the version comment in step. Our own workflows pin every action the same way.
 - **What the Action does:** `pip install` of this repository at that SHA, then runs the CLI on your files. It makes **no network calls** of its own (the only outbound traffic is `pip` and, if you opt in, `upload-sarif` / `attest` to GitHub). It executes nothing from your repo, never starts an MCP server, never reads a secret's value.
 - **Least privilege:** `contents: read` is enough for `check` and `scan`; add `pull-requests: write` only for the diff comment, `security-events: write` only for SARIF upload, `id-token: write` + `attestations: write` only for signing.
 - **Verify what you get:** every release is signed; `gh attestation verify` on the artifacts, and the [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/kunko-ai-labs/agent-assurance) of this repo is public.

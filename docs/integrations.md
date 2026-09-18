@@ -5,7 +5,7 @@
 ```bash
 pipx install agent-assurance              # from PyPI
 pipx install "agent-assurance[mcp]"       # with the MCP server
-pipx install git+https://github.com/kunko-ai-labs/agent-assurance@v0.5.1   # or pinned to a release tag
+pipx install git+https://github.com/kunko-ai-labs/agent-assurance@v0.5.2   # or pinned to a release tag
 ```
 
 Releases ship a wheel and an sdist with Sigstore build provenance (`gh attestation verify agent_assurance-*.whl -R kunko-ai-labs/agent-assurance`).
@@ -45,7 +45,7 @@ permissions:
 
 steps:
   - uses: actions/checkout@v4
-  - uses: kunko-ai-labs/agent-assurance@v0.5   # better: pin the commit SHA and let Dependabot bump it
+  - uses: kunko-ai-labs/agent-assurance@v0.5   # or pin the release's commit SHA (README: "Running third-party code in your CI")
     with:
       mode: diff             # on pull_request: what did this change do? (comment + gate)
       # mode: scan           # on push: observe + verify, SARIF to the Security tab
@@ -108,7 +108,7 @@ permissions:
   id-token: write
   attestations: write
 steps:
-  - uses: kunko-ai-labs/agent-assurance@v0.5   # better: pin the commit SHA and let Dependabot bump it
+  - uses: kunko-ai-labs/agent-assurance@v0.5   # or pin the release's commit SHA (README: "Running third-party code in your CI")
     with:
       mode: scan
       attest: sign          # 'write' = unsigned JSON artifact only

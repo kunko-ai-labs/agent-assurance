@@ -1,12 +1,30 @@
 [project]
 name = "agent-assurance"
-version = "0.5.1"
+version = "0.5.2"
 description = "Transparent, framework-agnostic assurance checks for AI agents, mapped to OWASP Agentic security standards."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Kunko AI Labs" }]
-keywords = ["ai-agents", "ai-security", "governance", "owasp", "assurance", "blast-radius"]
+keywords = ["ai-agents", "ai-security", "governance", "owasp", "assurance", "blast-radius", "mcp", "claude-code", "sarif", "in-toto"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+    "Environment :: Console",
+    "Typing :: Typed",
+]
 dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
@@ -16,6 +34,10 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/kunko-ai-labs/agent-assurance"
 Repository = "https://github.com/kunko-ai-labs/agent-assurance"
+Documentation = "https://github.com/kunko-ai-labs/agent-assurance/tree/main/docs"
+Changelog = "https://github.com/kunko-ai-labs/agent-assurance/releases"
+Issues = "https://github.com/kunko-ai-labs/agent-assurance/issues"
+Security = "https://github.com/kunko-ai-labs/agent-assurance/blob/main/SECURITY.md"
 
 [project.scripts]
 agent-assurance = "agent_assurance.cli:main"

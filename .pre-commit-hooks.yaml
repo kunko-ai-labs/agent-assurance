@@ -1,6 +1,6 @@
 # Use from another repo's .pre-commit-config.yaml:
 #   - repo: https://github.com/kunko-ai-labs/agent-assurance
-#     rev: v0.3.0
+#     rev: v0.5.2
 #     hooks:
 #       - id: agent-assurance-scan
 - id: agent-assurance-scan

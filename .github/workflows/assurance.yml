@@ -11,6 +11,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   medium-agent-passes:
     name: Medium-risk agent (must PASS)

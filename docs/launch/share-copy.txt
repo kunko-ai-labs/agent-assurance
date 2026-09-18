@@ -1,2 +1,0 @@
-Introducing agent-assurance: declare what your AI agent may do, and verify it on every change — while the agent edits, in the pull request, and signed on every release.
-Deterministic, open source, no LLM in the verdict. Mapped to the OWASP Agentic Top 10.

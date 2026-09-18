@@ -3,7 +3,7 @@
 1. On `develop`: bump `version` in `pyproject.toml` and `__version__` in `src/agent_assurance/__init__.py`; update `docs/ROADMAP.md`.
 2. PR `develop` → `main`; wait for CI.
 3. Tag on `main`: `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`, then move the floating tag: `git tag -f vX.Y && git push -f origin vX.Y`.
-4. `release.yml` runs on the tag: builds sdist + wheel, checks the tag matches the version, attests build provenance (Sigstore), attaches the files to the GitHub release, and publishes to PyPI through Trusted Publishing.
+4. `release.yml` runs on the tag: builds sdist + wheel, checks the tag matches the version, attests build provenance (Sigstore), creates the GitHub release if it does not exist yet (with generated notes you can edit afterwards), attaches the files, and publishes to PyPI through Trusted Publishing.
 5. Write the release notes on GitHub (the Marketplace listing updates itself while the checkbox stays on).
 
 ## One-time setup for PyPI (owner)

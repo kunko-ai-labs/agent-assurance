@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 
 from agent_assurance import cli
 
@@ -57,3 +58,24 @@ def test_card_theme_flag(tmp_path):
     assert '<html lang="en" data-theme="dark">' in text and "prefers-color-scheme: dark" in text
     cli.main(["scan", KEPT, "--format", "html", "-o", str(html)])
     assert "data-theme" not in html.read_text(encoding="utf-8").split("<head>")[0]  # auto follows the viewer
+
+
+def test_card_prints_cleanly(tmp_path):
+    """US-001-004: the printed card is white, legible, and nothing splits mid-page."""
+    html = tmp_path / "c.html"
+    cli.main(["scan", BROKEN, "--format", "html", "-o", str(html)])
+    text = html.read_text(encoding="utf-8")
+    css = text.split("<style>", 1)[1].split("</style>", 1)[0]
+    assert "@media print" in css
+    printed = css.split("@media print", 1)[1]
+    assert "--bg:#fff" in printed and "--panel:#fff" in printed  # white paper, light or dark theme
+    assert "box-shadow:none" in printed  # no decoration meant for a screen
+    assert "break-inside:avoid" in printed and "page-break-inside:avoid" in printed
+    assert ".card" in printed and "section.delta" in printed and "tr" in printed
+    assert "print-color-adjust:exact" in printed  # the verdict badge keeps its colour
+    assert "footer" in printed and "display:none" not in printed.replace(" ", "")
+    # what an auditor needs on paper is in the file itself
+    assert re.search(r"by agent-assurance \d+\.\d+\.\d+", text)  # footer: tool version
+    policed = tmp_path / "p.html"
+    cli.main(["scan", str(REPOS / "policy-org"), "--format", "html", "-o", str(policed)])
+    assert re.search(r"Policy: .+? · <code>[0-9a-f]{12}</code>", policed.read_text(encoding="utf-8"))

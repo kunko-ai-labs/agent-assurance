@@ -10,7 +10,7 @@ Matching is by package name first (exact, from `args`/`command`), then by a
 substring of the server's configured name. Package match wins because names are
 free-form ("gh", "github-prod"), packages are not.
 
-Catalogue version: 2026-09-17.
+Catalogue version: 2026-09-20.
 """
 
 from __future__ import annotations
@@ -245,6 +245,50 @@ CATALOG: tuple[CatalogEntry, ...] = (
         packages=("@gongrzhe/server-gmail-autoauth-mcp",),
         aliases=("gmail", "email", "mail"),
         source="npm @gongrzhe/server-gmail-autoauth-mcp (send_email)",
+    ),
+    # --- AI/agent data platforms (US-001-001) -------------------------------
+    CatalogEntry(
+        system="supabase",
+        capabilities=(Capability("read", R), Capability("write", W), Capability("execute", X)),
+        data=(DataClass.INTERNAL,),
+        packages=("@supabase/mcp-server-supabase",),
+        aliases=("supabase",),
+        # Read-only is opt-in: `readOnly` excludes mutating tools only when set,
+        # and defaults to false (package README + supabase.com/mcp).
+        source="supabase.com/mcp + @supabase/mcp-server-supabase README (readOnly defaults to false), read 2026-09-20",
+    ),
+    CatalogEntry(
+        system="cloudflare",
+        capabilities=(
+            Capability("read", R),
+            Capability("write", W),
+            Capability("delete", D, irreversible=True),
+        ),
+        data=(DataClass.INTERNAL,),
+        packages=("@cloudflare/mcp-server-cloudflare",),
+        aliases=("cloudflare",),
+        source="github.com/cloudflare/mcp-server-cloudflare README (read account configuration and apply suggested changes; Workers bindings, R2, ...), read 2026-09-20",
+    ),
+    CatalogEntry(
+        system="web",
+        capabilities=(Capability("scrape", R), Capability("search", R)),
+        packages=("firecrawl-mcp",),
+        aliases=("firecrawl",),
+        source="github.com/firecrawl/firecrawl-mcp-server README (scrape, map, crawl, search, parse, research; read-only search profile), read 2026-09-20",
+    ),
+    CatalogEntry(
+        system="web",
+        capabilities=(Capability("search", R), Capability("extract", R)),
+        packages=("tavily-mcp",),
+        aliases=("tavily",),
+        source="github.com/tavily-ai/tavily-mcp README (tavily-search, tavily-extract, map, crawl), read 2026-09-20",
+    ),
+    CatalogEntry(
+        system="web",
+        capabilities=(Capability("search", R), Capability("fetch", R)),
+        packages=("exa-mcp-server",),
+        aliases=("exa",),
+        source="github.com/exa-labs/exa-mcp-server README (web_search_exa, web_fetch_exa; optional agent_run), read 2026-09-20",
     ),
 )
 

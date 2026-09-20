@@ -65,13 +65,20 @@ _BUILTIN: dict[str, tuple[ToolAccess, str]] = {
     "KillShell": (ToolAccess.READ, "shell"),
     "ExitPlanMode": (ToolAccess.READ, "claude-code"),
 }
-# First word of a scoped Bash rule that only reads. Deliberately short and
-# boring; anything not here is treated as execute.
+# First word(s) of a scoped Bash rule that only reads. Deliberately short and
+# boring; anything not here is treated as execute. Multi-word entries are
+# matched longest-prefix-first, so `git remote -v` is safe to add while a bare
+# `git remote` stays execute (it can add/remove remotes). `gh api` and
+# `git tag` are deliberately absent for the same reason: both can write.
 _READ_ONLY_COMMANDS = {
     "ls", "cat", "head", "tail", "less", "grep", "rg", "find", "fd", "wc", "echo",
     "pwd", "which", "type", "env", "printenv", "tree", "stat", "file", "diff",
+    "du", "df", "uname",
     "git status", "git diff", "git log", "git show", "git branch", "git blame",
-    "gh pr view", "gh pr list", "gh issue view", "gh issue list", "gh run list", "gh run view",
+    "git fetch", "git rev-parse", "git describe", "git remote -v",
+    "gh pr view", "gh pr list", "gh pr diff", "gh issue view", "gh issue list",
+    "gh run list", "gh run view",
+    "node --version", "python --version", "npm ls", "pip list", "cargo tree", "go list",
 }
 _RULE_RE = re.compile(r"^(?P<tool>[A-Za-z_][A-Za-z0-9_]*)(?:\((?P<spec>.*)\))?$")
 _MODE_TO_APPROVAL = {"allow": "auto", "ask": "ask"}

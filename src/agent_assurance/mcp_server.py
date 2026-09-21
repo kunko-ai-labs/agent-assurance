@@ -30,10 +30,18 @@ from .scan import scan_directory
 
 try:
     from mcp.server.mcpserver import MCPServer
+    from mcp.types import ToolAnnotations
 except ImportError as exc:  # pragma: no cover - import guard
     raise SystemExit(
         "agent-assurance-mcp needs the MCP SDK: pip install 'agent-assurance[mcp]'"
     ) from exc
+
+# Every tool declares what it does, the same way we ask agents to. All three
+# only read the repository: `would_break` simulates the change in a temporary
+# copy it creates and removes itself; the repository is never touched.
+_READ_ONLY = ToolAnnotations(
+    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+)
 
 server = MCPServer(
     name="agent-assurance",
@@ -80,12 +88,15 @@ def _report(directory: str, manifest: str | None) -> str:
     return to_markdown(engine.run(result.observed, None, ctx, result.sources))
 
 
-@server.tool(description="Observe what this repository's agent configuration grants and verify it against agent-assurance.yaml. Returns the markdown report with verdicts AA-001 (blast radius) and AA-002 (declared vs observed).")
+@server.tool(
+    annotations=_READ_ONLY,
+    description="Observe what this repository's agent configuration grants and verify it against agent-assurance.yaml. Returns the markdown report with verdicts AA-001 (blast radius) and AA-002 (declared vs observed).",
+)
 def scan(directory: str = ".", manifest: str | None = None) -> str:
     return _report(directory, manifest)
 
 
-@server.tool(description="Blast radius of a manifest alone (no scan).")
+@server.tool(annotations=_READ_ONLY, description="Blast radius of a manifest alone (no scan).")
 def check(manifest: str = "agent-assurance.yaml") -> str:
     try:
         m = Manifest.from_file(manifest)
@@ -94,7 +105,10 @@ def check(manifest: str = "agent-assurance.yaml") -> str:
     return to_markdown(engine.run(m))
 
 
-@server.tool(description="Would adding this change break the repository's promise? Pass either mcp_server (a JSON object as it would appear under mcpServers, plus its name) or claude_permission (a rule such as 'Bash(*)' with mode allow/ask). Nothing is written to the repository; the change is simulated in a temporary copy.")
+@server.tool(
+    annotations=_READ_ONLY,
+    description="Would adding this change break the repository's promise? Pass either mcp_server (a JSON object as it would appear under mcpServers, plus its name) or claude_permission (a rule such as 'Bash(*)' with mode allow/ask). Nothing is written to the repository; the change is simulated in a temporary copy.",
+)
 def would_break(
     directory: str = ".",
     mcp_server_name: str | None = None,
@@ -106,8 +120,15 @@ def would_break(
     try:
         head = os.path.join(tmp, "head")
         os.makedirs(head)
-        for rel in ("agent-assurance.yaml", ".mcp.json", ".cursor/mcp.json", ".vscode/mcp.json",
-                    ".gemini/settings.json", ".claude/settings.json", ".claude/settings.local.json"):
+        for rel in (
+            "agent-assurance.yaml",
+            ".mcp.json",
+            ".cursor/mcp.json",
+            ".vscode/mcp.json",
+            ".gemini/settings.json",
+            ".claude/settings.json",
+            ".claude/settings.local.json",
+        ):
             src = os.path.join(directory, rel)
             if os.path.isfile(src):
                 os.makedirs(os.path.dirname(os.path.join(head, rel)), exist_ok=True)
@@ -118,7 +139,9 @@ def would_break(
         if claude_permission:
             path = os.path.join(head, ".claude", "settings.json")
             data = _read_json(path)
-            data.setdefault("permissions", {}).setdefault(claude_permission_mode, []).append(claude_permission)
+            data.setdefault("permissions", {}).setdefault(claude_permission_mode, []).append(
+                claude_permission
+            )
             _write_json(path, data)
 
         d = compute(directory, head)

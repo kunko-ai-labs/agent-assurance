@@ -49,3 +49,28 @@ def test_would_break_with_claude_permission():
 async def test_tools_are_registered():
     tools = await mcp_server.server.list_tools()
     assert {t.name for t in tools} == {"scan", "check", "would_break"}
+
+
+@pytest.mark.anyio
+async def test_every_tool_declares_all_four_hints_as_read_only():
+    """Hosts warn users from these hints; nothing here writes to the repository."""
+    for tool in await mcp_server.server.list_tools():
+        a = tool.annotations
+        assert a is not None, tool.name
+        hints = a.model_dump(by_alias=True)
+        expected = {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        }
+        assert {k: hints[k] for k in expected} == expected, tool.name
+
+
+def test_check_tool_reports_blast_radius(tmp_path):
+    manifest = tmp_path / "agent-assurance.yaml"
+    manifest.write_text(
+        pathlib.Path("examples/repos/mcp-promise-kept/agent-assurance.yaml").read_text()
+    )
+    out = mcp_server.check(str(manifest))
+    assert "AA-001" in out and "Blast radius" in out

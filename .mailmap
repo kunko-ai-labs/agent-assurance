@@ -1,0 +1,5 @@
+# Canonical author identities. Old commits carry a machine-local email;
+# git and GitHub read this file so history shows one author.
+Vane <barroetav@gmail.com> VMBB <vanessa@MacBook-Pro-3.local>
+Vane <barroetav@gmail.com> VMBB <vmbb13@users.noreply.github.com>
+Vane <barroetav@gmail.com> Vane <barroetav@gmail.com>

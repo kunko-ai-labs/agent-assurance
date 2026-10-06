@@ -50,6 +50,6 @@ pip install -e ".[dev]"
 ruff check src tests && pytest -q
 ```
 
-Rules that do not bend (see `CLAUDE.md`): no LLM in the verdict; nothing executed or sent; unknown is `UNKNOWN`; exit codes `0/1/2` are a contract; a step name with `:` in `action.yml` goes in quotes; a new scanner or check comes with a fixture in `examples/repos/`, a test, and a job in `assurance.yml`; a new MCP catalogue entry cites its source.
+Rules that do not bend: no LLM in the verdict; nothing executed or sent; unknown is `UNKNOWN`; exit codes `0/1/2` are a contract; a step name with `:` in `action.yml` goes in quotes; a new scanner or check comes with a fixture in `examples/repos/`, a test, and a job in `assurance.yml`; a new MCP catalogue entry cites its source.
 
 Before a release: scan a few real public repos (`docs/real-world.md`) and re-check `docs/landscape.md`.

@@ -14,6 +14,14 @@ holds more than it should) and ASI04 (Agentic supply chain: a new server
 quietly widens reach). Adapted from EU AI Act art. 12 (record-keeping that lets
 an auditor reconstruct what the system could do at a point in time): this
 verdict, per commit, is that record for capabilities.
+
+Compliance mappings (rationale in docs/compliance-mapping.md):
+  - OWASP LLM07 (Insecure Plugin Design): each tool/plugin's observed grants
+    are verified against its declared grant — catching excessive permissions.
+  - NIST AI RMF MEASURE-3: a per-commit risk-tracking mechanism that detects
+    capability drift.
+  - ISO/IEC 42001 A.9.2 (intended use): the declared manifest states the
+    intended use; the check verifies the observed configuration stays within it.
 """
 
 from __future__ import annotations
@@ -57,7 +65,10 @@ class DeclaredVsObservedCheck(Check):
     standards: ClassVar[list[StandardRef]] = [
         StandardRef("OWASP-ASI", "ASI03", "maps"),
         StandardRef("OWASP-ASI", "ASI04", "maps"),
-        StandardRef("EU-AI-Act", "Art.12", "adapted"),
+        StandardRef("EU-AI-ACT", "Art. 12", "adapted"),
+        StandardRef("OWASP-LLM", "LLM07", "maps"),
+        StandardRef("NIST-AI-RMF", "MEASURE-3", "maps"),
+        StandardRef("ISO-42001", "A.9.2", "maps"),
     ]
 
     def applicable(self, ctx: Context) -> bool:

@@ -7,6 +7,15 @@ the potential impact surface, transparently, from the manifest alone.
 Maps to OWASP Agentic Top 10 ASI08 (Cascading failures) and ASI03 (Identity &
 privilege abuse). Adapted from OWASP APTS SC-020 (external action allowlist),
 whose intent — bounding what an autonomous system can reach — transfers cleanly.
+
+Compliance mappings (rationale in docs/compliance-mapping.md):
+  - OWASP LLM08 (Excessive Agency): the check measures exactly that — the
+    permissions, functionality and autonomy granted to the agent.
+  - EU AI Act Art. 14 (Human oversight): auto-approved tools and autonomy
+    levels are the raw material for a human-oversight assessment.
+  - NIST AI RMF MAP-5: the check assesses the magnitude of potential impacts.
+  - ISO/IEC 42001 A.5.2 (AI system impact assessment): a per-commit, automated
+    impact assessment of the AI system.
 """
 
 from __future__ import annotations
@@ -29,6 +38,10 @@ class BlastRadiusCheck(Check):
         StandardRef("OWASP-ASI", "ASI08", "maps"),
         StandardRef("OWASP-ASI", "ASI03", "maps"),
         StandardRef("OWASP-APTS", "APTS-SC-020", "adapted"),
+        StandardRef("OWASP-LLM", "LLM08", "maps"),
+        StandardRef("EU-AI-ACT", "Art. 14", "maps"),
+        StandardRef("NIST-AI-RMF", "MAP-5", "maps"),
+        StandardRef("ISO-42001", "A.5.2", "maps"),
     ]
 
     def run(self, manifest: Manifest, ctx: Context) -> CheckResult:

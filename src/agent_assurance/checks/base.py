@@ -2,8 +2,10 @@
 
 A check consumes a Manifest and returns a CheckResult. Checks map to standards
 (primarily OWASP Agentic Top 10 / ASI; APTS where the control genuinely
-transfers from the pentest domain). Keeping this contract tiny is what lets the
-GitHub Action stay a thin wrapper over a growing set of checks.
+transfers from the pentest domain; and, since issue #53, the compliance
+frameworks a CISO actually gets asked about: EU AI Act, NIST AI RMF,
+ISO/IEC 42001 and the OWASP LLM Top 10). Keeping this contract tiny is what
+lets the GitHub Action stay a thin wrapper over a growing set of checks.
 """
 
 from __future__ import annotations
@@ -21,6 +23,24 @@ class Status(str, Enum):
     FAIL = "FAIL"
 
 
+# The closed vocabulary for StandardRef.framework. A typo'd framework name in
+# a new check must fail loudly (the test in test_compliance_mapping.py iterates
+# the whole registry), not silently produce a report column nobody recognizes.
+KNOWN_FRAMEWORKS: frozenset[str] = frozenset(
+    {
+        # Compliance frameworks (issue #53).
+        "EU-AI-ACT",  # EU Artificial Intelligence Act (Regulation (EU) 2024/1689)
+        "NIST-AI-RMF",  # NIST AI Risk Management Framework (AI 100-1)
+        "ISO-42001",  # ISO/IEC 42001 AI management system, Annex A controls
+        "OWASP-LLM",  # OWASP Top 10 for LLM Applications (2025 edition)
+        # Existing mappings.
+        "OWASP-ASI",  # OWASP Agentic AI Top 10 (security initiative)
+        "OWASP-APTS",  # OWASP Agentic Pentesting Standard (transferred domain)
+        "arXiv",  # published-paper basis, when a check implements one
+    }
+)
+
+
 @dataclass
 class StandardRef:
     """A mapping from a check to a published standard control.
@@ -28,10 +48,15 @@ class StandardRef:
     `relation` is honest about strength:
       - "maps"        : the control is directly about this (business agents)
       - "adapted"     : transferred from a neighbouring domain (e.g. APTS pentest)
+
+    The full rationale for each check's mappings — why a ref is "maps" rather
+    than "adapted", and where gaps are deliberately left unmapped — lives in
+    docs/compliance-mapping.md. Leave a check unmapped rather than inventing a
+    mapping.
     """
 
-    framework: str  # "OWASP-ASI", "OWASP-APTS", "arXiv"
-    control: str  # "ASI08", "APTS-SC-020", "2609.07395"
+    framework: str  # one of KNOWN_FRAMEWORKS
+    control: str  # "ASI08", "APTS-SC-020", "Art. 14", "MAP-5", "A.5.2", "LLM08"
     relation: str = "maps"
 
 

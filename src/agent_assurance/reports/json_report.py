@@ -4,7 +4,35 @@ from __future__ import annotations
 
 import json
 
+from ..coverage import FRAMEWORK_ORDER, coverage_matrix
 from ..engine import AssuranceReport
+
+
+def _coverage(report: AssuranceReport) -> dict:
+    """The framework x checks coverage matrix, machine-readable.
+
+    Every row carries every framework in canonical order; a framework the
+    check does not address gets an empty `controls` list — gaps are explicit,
+    never omitted.
+    """
+    return {
+        "frameworks": list(FRAMEWORK_ORDER),
+        "rows": [
+            {
+                "check_id": row.check_id,
+                "title": row.title,
+                "status": row.status,
+                "mappings": {
+                    fw: [
+                        {"control": s.control, "relation": s.relation}
+                        for s in row.mappings[fw]
+                    ]
+                    for fw in FRAMEWORK_ORDER
+                },
+            }
+            for row in coverage_matrix(report.results)
+        ],
+    }
 
 
 def to_dict(report: AssuranceReport) -> dict:
@@ -37,6 +65,7 @@ def to_dict(report: AssuranceReport) -> dict:
             }
             for r in report.results
         ],
+        "coverage": _coverage(report),
         "sources": [
             {"path": s.path, "kind": s.kind, "supported": s.supported, "note": s.note}
             for s in report.sources

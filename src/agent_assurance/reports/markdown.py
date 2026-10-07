@@ -1,13 +1,16 @@
 """Markdown renderer — the PR comment. This is the viral surface.
 
 Designed to be readable at a glance in a GitHub PR: a clear verdict header,
-one block per check with its standard mappings, and the transparent risk
-breakdown so nobody has to trust a black box.
+one block per check with its standard mappings, a coverage matrix showing
+which compliance frameworks each check speaks to (gaps shown as em dashes,
+never hidden), and the transparent risk breakdown so nobody has to trust a
+black box.
 """
 
 from __future__ import annotations
 
 from ..checks.base import Status
+from ..coverage import FRAMEWORK_ORDER, cell_text, coverage_matrix
 from ..engine import AssuranceReport
 
 _ICON = {Status.PASS: "\u2705", Status.REVIEW: "\u26a0\ufe0f", Status.FAIL: "\u274c"}
@@ -32,6 +35,32 @@ def _standards_line(result) -> str:
             tag += f" ({s.relation})"
         parts.append(tag)
     return "Standards: " + ", ".join(parts)
+
+
+def _append_coverage_matrix(lines: list[str], report: AssuranceReport) -> None:
+    """Append the framework x checks coverage matrix.
+
+    Rows are the checks that ran; columns are the frameworks in canonical
+    order; gaps are explicit em-dash cells. This is the compliance summary a
+    CISO scans before opening the per-check detail above.
+    """
+    rows = coverage_matrix(report.results)
+    lines.append("### \U0001f4ca Coverage matrix")
+    lines.append("")
+    header = "| Check | " + " | ".join(FRAMEWORK_ORDER) + " |"
+    lines.append(header)
+    lines.append("|" + "---|" * (len(FRAMEWORK_ORDER) + 1))
+    for row in rows:
+        cells = [cell_text(row.mappings[fw]) for fw in FRAMEWORK_ORDER]
+        lines.append(f"| {row.check_id} — {row.title} | " + " | ".join(cells) + " |")
+    lines.append("")
+    lines.append(
+        "_Gaps (—) are explicit: the check does not claim to address that "
+        "framework. See [compliance-mapping.md]"
+        "(https://github.com/kunko-ai-labs/agent-assurance/blob/main/docs/compliance-mapping.md) "
+        "for the rationale behind each mapping._"
+    )
+    lines.append("")
 
 
 def to_markdown(report: AssuranceReport) -> str:
@@ -63,6 +92,8 @@ def to_markdown(report: AssuranceReport) -> str:
             lines.append("")
             lines.append(f"_{std}_")
         lines.append("")
+
+    _append_coverage_matrix(lines, report)
 
     if report.sources:
         lines.append("<details><summary>Sources scanned</summary>")

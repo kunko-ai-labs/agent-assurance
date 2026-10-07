@@ -39,7 +39,7 @@ def test_predicate_carries_declared_observed_and_verdict(tmp_path):
     assert p["declared"]["agent"]["name"] == "analytics-helper"
     assert any(t["source"] for t in p["observed"]["tools"])
     assert p["report"]["verdict"] == "FAIL"
-    assert "OWASP-ASI:ASI03" in p["standards"] and "EU-AI-Act:Art.12" in p["standards"]
+    assert "OWASP-ASI:ASI03" in p["standards"] and "EU-AI-ACT:Art. 12" in p["standards"]
     assert p["generatedAt"].endswith("+00:00")
 
 

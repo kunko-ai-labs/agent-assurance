@@ -76,6 +76,11 @@ class Check:
     check_id: str = "AA-000"
     title: str = "Unnamed check"
     standards: ClassVar[list[StandardRef]] = []
+    # A mandatory check failing caps the overall grade (see grade.py): its
+    # FAIL must never be averaged away by good scores elsewhere. Opt-in per
+    # check; False by default so new checks stay non-capping until the author
+    # decides the failure is load-bearing.
+    mandatory: ClassVar[bool] = False
 
     def applicable(self, ctx: Context) -> bool:
         """Whether this check makes sense with the inputs at hand."""

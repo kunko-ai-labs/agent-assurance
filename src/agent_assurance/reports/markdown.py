@@ -7,6 +7,7 @@ breakdown so nobody has to trust a black box.
 
 from __future__ import annotations
 
+from .. import grade as _grade
 from ..checks.base import Status
 from ..engine import AssuranceReport
 
@@ -34,6 +35,47 @@ def _standards_line(result) -> str:
     return "Standards: " + ", ".join(parts)
 
 
+def _grade_header_line(report: AssuranceReport) -> str:
+    g = report.grade
+    if g is None:
+        return "**Grade:** n/a — no checks assessed"
+    return f"**Grade:** `{g.letter}` ({g.score:g}/100) — *{g.disclaimer}*"
+
+
+def _grade_breakdown(report: AssuranceReport) -> list[str]:
+    """Collapsible pillar table: the grade is a summary, the pillars are the story."""
+    g = report.grade
+    if g is None:
+        return []
+    lines = ["<details><summary>Grade breakdown</summary>", ""]
+    lines.append("| Pillar | Weight | Score | Basis |")
+    lines.append("|---|---|---|---|")
+    for p in g.pillars:
+        lines.append(f"| {p.title} | {p.weight:.0%} | {p.score:g}/100 | {p.detail} |")
+    lines.append("")
+    if g.capped:
+        ids = ", ".join(g.capped_by)
+        if g.letter != g.letter_before_cap:
+            lines.append(
+                f"Capped at `{g.letter}`: mandatory check {ids} failed "
+                f"(the pillar arithmetic alone would have been `{g.letter_before_cap}`)."
+            )
+        else:
+            lines.append(
+                f"Mandatory check {ids} failed; the grade is already at or below "
+                f"the `{_grade.MANDATORY_FAIL_CAP}` cap."
+            )
+        lines.append("")
+    lines.append(
+        "_Skipped checks leave their pillar unassessed; the remaining weights are "
+        "renormalised. Methodology: `docs/methodology.md`._"
+    )
+    lines.append("")
+    lines.append("</details>")
+    lines.append("")
+    return lines
+
+
 def to_markdown(report: AssuranceReport) -> str:
     m = report.manifest
     lines: list[str] = []
@@ -49,7 +91,9 @@ def to_markdown(report: AssuranceReport) -> str:
         lines.append(f"**Mode:** scan — {mode}")
     if report.policy:
         lines.append(f"**Policy:** {report.policy['name']} (`{report.policy['sha256'][:12]}`)")
+    lines.append(_grade_header_line(report))
     lines.append("")
+    lines.extend(_grade_breakdown(report))
 
     for r in report.results:
         lines.append(f"### {_ICON[r.status]} {r.check_id} — {r.title} · {r.status.value}")

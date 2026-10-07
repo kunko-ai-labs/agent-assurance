@@ -25,6 +25,10 @@ FAIL_BANDS = {"CRITICAL"}
 class BlastRadiusCheck(Check):
     check_id = "AA-001"
     title = "Blast Radius"
+    # Mandatory: a CRITICAL blast radius must cap the overall grade. An agent
+    # that can destroy a lot may not look "above average" on the strength of
+    # other pillars.
+    mandatory = True
     standards: ClassVar[list[StandardRef]] = [
         StandardRef("OWASP-ASI", "ASI08", "maps"),
         StandardRef("OWASP-ASI", "ASI03", "maps"),

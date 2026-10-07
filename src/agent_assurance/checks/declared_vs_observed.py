@@ -54,6 +54,9 @@ def _loc(source: str | None) -> Location | None:
 class DeclaredVsObservedCheck(Check):
     check_id = "AA-002"
     title = "Declared vs Observed"
+    # Mandatory: a broken promise (undeclared dangerous capabilities) must cap
+    # the overall grade. Governance failures are not averageable.
+    mandatory = True
     standards: ClassVar[list[StandardRef]] = [
         StandardRef("OWASP-ASI", "ASI03", "maps"),
         StandardRef("OWASP-ASI", "ASI04", "maps"),

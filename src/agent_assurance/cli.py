@@ -20,7 +20,7 @@ import sys
 
 import yaml
 
-from . import __version__, attest, diff, engine, policy, reports
+from . import __version__, attest, diff, engine, grade, policy, reports
 from .checks import CHECK_ALIASES
 from .checks.base import Context, Status
 from .manifest import Manifest, ManifestError
@@ -54,6 +54,18 @@ def _load(path: str) -> Manifest | None:
     return None
 
 
+def _grade_line(report: engine.AssuranceReport) -> str:
+    """One-line grade summary for the CLI; stderr keeps stdout reports parseable."""
+    g = report.grade
+    if g is None:
+        return "grade: n/a (no checks assessed)"
+    line = f"grade: {g.letter} ({g.score:g}/100)"
+    if g.capped:
+        line += f" — capped at {grade.MANDATORY_FAIL_CAP} by {', '.join(g.capped_by)}"
+    line += f" — {g.disclaimer}"
+    return line
+
+
 def _emit(report: engine.AssuranceReport, args: argparse.Namespace, anchor: str) -> None:
     if args.format == "html":
         output = reports.to_html(report, theme=getattr(args, "theme", "auto"))
@@ -65,6 +77,7 @@ def _emit(report: engine.AssuranceReport, args: argparse.Namespace, anchor: str)
         print(f"wrote {args.format} report to {args.output}", file=sys.stderr)
     else:
         print(output)
+    print(_grade_line(report), file=sys.stderr)
 
 
 def _gate(report: engine.AssuranceReport, fail_on: str) -> int:

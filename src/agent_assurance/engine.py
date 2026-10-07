@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from . import grade as _grade
 from . import policy as _policy
 from .checks import ALL_CHECKS
 from .checks.base import CheckResult, Context, Status
@@ -40,6 +41,11 @@ class AssuranceReport:
     @property
     def passed(self) -> bool:
         return self.verdict != Status.FAIL
+
+    @property
+    def grade(self) -> _grade.Grade | None:
+        """Overall A-F grade for this run; None when no pillar was assessed."""
+        return _grade.grade_results(self.results)
 
 
 def run(

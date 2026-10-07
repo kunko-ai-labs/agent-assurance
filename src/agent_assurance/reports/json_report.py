@@ -7,6 +7,30 @@ import json
 from ..engine import AssuranceReport
 
 
+def _grade_dict(report: AssuranceReport) -> dict | None:
+    g = report.grade
+    if g is None:
+        return None
+    return {
+        "letter": g.letter,
+        "letter_before_cap": g.letter_before_cap,
+        "score": g.score,
+        "capped": g.capped,
+        "capped_by": list(g.capped_by),
+        "disclaimer": g.disclaimer,
+        "pillars": [
+            {
+                "id": p.pillar,
+                "title": p.title,
+                "weight": p.weight,
+                "score": p.score,
+                "detail": p.detail,
+            }
+            for p in g.pillars
+        ],
+    }
+
+
 def to_dict(report: AssuranceReport) -> dict:
     return {
         "apiVersion": "agent-assurance/v1",
@@ -16,6 +40,7 @@ def to_dict(report: AssuranceReport) -> dict:
         },
         "verdict": report.verdict.value,
         "passed": report.passed,
+        "grade": _grade_dict(report),
         "policy": report.policy,
         "checks": [
             {

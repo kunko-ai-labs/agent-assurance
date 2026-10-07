@@ -1,0 +1,11 @@
+{
+  "author": {
+    "name": "Kunko AI Labs"
+  },
+  "description": "Run agent-assurance checks on a repo's agent configuration from inside Claude Code — the same checks, commands and report formats the GitHub Action runs — and get a plain-language scorecard with pointers to fixes.",
+  "homepage": "https://github.com/kunko-ai-labs/agent-assurance",
+  "license": "Apache-2.0",
+  "name": "agent-assurance",
+  "repository": "https://github.com/kunko-ai-labs/agent-assurance",
+  "version": "0.6.0"
+}

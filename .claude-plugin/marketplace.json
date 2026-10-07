@@ -1,0 +1,18 @@
+{
+  "name": "kunko-ai-labs",
+  "owner": {
+    "name": "Kunko AI Labs"
+  },
+  "plugins": [
+    {
+      "author": {
+        "name": "Kunko AI Labs"
+      },
+      "description": "Assurance checks for AI agent configuration, run from inside Claude Code: scan the promise, read the scorecard, fix what is broken.",
+      "license": "Apache-2.0",
+      "name": "agent-assurance",
+      "source": "./contrib/claude-code",
+      "version": "0.6.0"
+    }
+  ]
+}

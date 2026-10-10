@@ -72,11 +72,43 @@ def test_declared_metadata_survives_merge():
         ("brave-search", "", "web"),
         ("totally-new", "node server.js", None),
         ("digital-ocean", "", None),  # token match: "git" must not match "digital"
+        # US-001-001: the five servers the story adds.
+        ("supabase", "npx -y @supabase/mcp-server-supabase", "supabase"),
+        ("cloudflare", "npx -y @cloudflare/mcp-server-cloudflare", "cloudflare"),
+        ("firecrawl-mcp", "npx -y firecrawl-mcp", "web"),
+        ("tavily", "npx -y tavily-mcp@latest", "web"),
+        ("exa", "npx -y exa-mcp-server", "web"),
     ],
 )
 def test_catalog_lookup(name, cmd, system):
     entry = catalog.lookup(name, cmd)
     assert (entry.system if entry else None) == system
+
+
+def test_catalog_new_entries_have_the_researched_classes():
+    """US-001-001: each class comes from the server's own documentation.
+
+    Supabase's read-only mode is opt-in (`readOnly` defaults to false), so its
+    entry carries write and execute as well as read. Cloudflare's servers read
+    account configuration *and* can apply changes, so delete is irreversible.
+    Firecrawl, Tavily and Exa are read-only web surfaces.
+    """
+    supabase = catalog.lookup("supabase", "@supabase/mcp-server-supabase")
+    assert supabase is not None
+    assert {c.access for c in supabase.capabilities} >= {ToolAccess.READ, ToolAccess.WRITE}
+
+    cloudflare = catalog.lookup("cloudflare", "@cloudflare/mcp-server-cloudflare")
+    assert cloudflare is not None
+    assert any(c.access is ToolAccess.DELETE and c.irreversible for c in cloudflare.capabilities)
+
+    for name, cmd in (
+        ("firecrawl", "firecrawl-mcp"),
+        ("tavily", "tavily-mcp"),
+        ("exa", "exa-mcp-server"),
+    ):
+        entry = catalog.lookup(name, cmd)
+        assert entry is not None and entry.system == "web", entry
+        assert all(c.access is ToolAccess.READ for c in entry.capabilities), entry
 
 
 # --- AA-002 through the CLI --------------------------------------------------

@@ -228,6 +228,50 @@ def test_scoped_read_only_bash_is_read_not_execute(tmp_path):
     assert len(g) == 3
 
 
+@pytest.mark.parametrize(
+    "rule",
+    [
+        "Bash(git fetch:*)",
+        "Bash(git remote -v:*)",
+        "Bash(git rev-parse:*)",
+        "Bash(git describe:*)",
+        "Bash(gh pr diff:*)",
+        "Bash(ls -la:*)",
+        "Bash(du:*)",
+        "Bash(df:*)",
+        "Bash(uname:*)",
+        "Bash(node --version:*)",
+        "Bash(python --version:*)",
+        "Bash(npm ls:*)",
+        "Bash(pip list:*)",
+        "Bash(cargo tree:*)",
+        "Bash(go list:*)",
+    ],
+)
+def test_extended_read_only_bash_is_read(tmp_path, rule):
+    """US-001-002: each newly allow-listed command is a scoped read."""
+    d = tmp_path / ".claude"
+    d.mkdir()
+    (d / "settings.json").write_text(
+        json.dumps({"permissions": {"allow": [rule]}}), encoding="utf-8"
+    )
+    g = _grants(scan_directory(str(tmp_path)))
+    assert (ToolAccess.READ, "shell", "auto", True) in g, g
+
+
+@pytest.mark.parametrize("rule", ["Bash(gh api:*)", "Bash(git tag:*)", "Bash(git remote:*)"])
+def test_write_capable_bash_stays_execute(tmp_path, rule):
+    """US-001-002: commands that can mutate stay execute, never read."""
+    d = tmp_path / ".claude"
+    d.mkdir()
+    (d / "settings.json").write_text(
+        json.dumps({"permissions": {"allow": [rule]}}), encoding="utf-8"
+    )
+    g = _grants(scan_directory(str(tmp_path)))
+    assert (ToolAccess.EXECUTE, "shell", "auto", True) in g, g
+    assert not any(k[0] is ToolAccess.READ for k in g), g
+
+
 def test_claude_settings_deny_overrides_allow(tmp_path):
     d = tmp_path / ".claude"
     d.mkdir()

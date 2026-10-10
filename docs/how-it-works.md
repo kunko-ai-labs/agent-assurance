@@ -41,7 +41,7 @@ Schema: [`schema/agent-assurance.schema.json`](../schema/agent-assurance.schema.
 | `Read`, `Glob`, `Grep`, `LS`, `WebFetch`, `WebSearch` | read | |
 | `Edit`, `Write`, `MultiEdit`, `NotebookEdit` | write | +2 points if `allow` and unscoped |
 | `Bash`, `Bash(*)` | execute, unscoped | +2 points if `allow`; breaks a promise of autonomy ≤ L2 |
-| `Bash(git status:*)`, `Bash(grep:*)`, `Bash(ls:*)`… | read (scoped) | read-only commands are not "the agent runs shell unattended" |
+| `Bash(git status:*)`, `Bash(grep:*)`, `Bash(ls:*)`, `Bash(git fetch:*)`, `Bash(du:*)`, `Bash(pip list:*)`… | read (scoped) | read-only commands are not "the agent runs shell unattended"; `gh api`, `git tag` and a bare `git remote` stay execute |
 | `Bash(npm test:*)`, any other scoped command | execute (scoped) | no auto-approval penalty; AA-002 says *review*, not *broken* |
 | `Agent`, `Task` | execute (subagents) | |
 | `mcp__<server>__<tool>`, `mcp__<server>` | the server's widest class from the catalogue | a single tool is scoped; a whole server is not |

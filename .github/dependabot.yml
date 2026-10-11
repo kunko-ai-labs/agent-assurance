@@ -2,6 +2,7 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    target-branch: staging
     schedule: { interval: weekly }
     groups:
       # init, analyze and upload-sarif must run the same version: a mixed
@@ -11,4 +12,5 @@ updates:
           - "github/codeql-action*"
   - package-ecosystem: pip
     directory: /
+    target-branch: staging
     schedule: { interval: weekly }

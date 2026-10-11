@@ -18,7 +18,10 @@ access class, is what these files change.
 Rules are collapsed per capability class: ten `allow: Bash(...)` rules are one
 shell grant, not ten capabilities. A scoped rule (`Bash(npm test:*)`) keeps the
 class but is marked scoped; a scoped rule whose command is read-only
-(`Bash(git status:*)`, `Bash(grep:*)`) is a read, not an execute.
+(`Bash(git status:*)`, `Bash(grep:*)`) is a read, not an execute. Read-only
+means every command the rule can let through only reads: `Bash(find:*)` also
+lets `find -exec` through, so it is execute; shell operators make any rule
+execute; a rule that does not parse is UNKNOWN, never dropped.
 
 Built-in tools map to classes as follows; anything else is UNKNOWN:
   Bash                              -> execute (shell); read if only read-only commands
@@ -34,6 +37,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
+import unicodedata
 
 from .. import policy
 from ..manifest import Tool, ToolAccess
@@ -65,28 +70,247 @@ _BUILTIN: dict[str, tuple[ToolAccess, str]] = {
     "KillShell": (ToolAccess.READ, "shell"),
     "ExitPlanMode": (ToolAccess.READ, "claude-code"),
 }
-# First word of a scoped Bash rule that only reads. Deliberately short and
-# boring; anything not here is treated as execute.
-_READ_ONLY_COMMANDS = {
-    "ls", "cat", "head", "tail", "less", "grep", "rg", "find", "fd", "wc", "echo",
-    "pwd", "which", "type", "env", "printenv", "tree", "stat", "file", "diff",
-    "git status", "git diff", "git log", "git show", "git branch", "git blame",
+# Read-only Bash rules. Deny by default: a rule is a read only when every
+# command it can let through only reads; anything else is execute.
+#
+# Commands with no option that runs a program, writes or deletes: a read with
+# any arguments, so a prefix rule (`Bash(grep:*)`) is a read.
+_READ_ONLY_ANY_ARGS = {
+    "ls", "cat", "head", "tail", "grep", "wc", "echo", "pwd", "which", "type",
+    "printenv", "stat", "diff",
+    "git status", "git blame",
     "gh pr view", "gh pr list", "gh issue view", "gh issue list", "gh run list", "gh run view",
 }
-_RULE_RE = re.compile(r"^(?P<tool>[A-Za-z_][A-Za-z0-9_]*)(?:\((?P<spec>.*)\))?$")
+# Commands that read with some options and run programs or write files with
+# others (`find -exec`, `fd -x`, `rg --pre`, `tree -o`, `file -C`,
+# `git diff --output`, `git branch -D`, `env <cmd>`). A read only for an exact
+# rule (no `*`) whose every option is listed here; a wildcard rule is execute.
+_GIT_DIFF_OPTS = {
+    "--", "-p", "--patch", "-u", "-s", "--no-patch", "--raw", "--stat", "--numstat", "--shortstat",
+    "--dirstat", "--summary", "--name-only", "--name-status", "--cached", "--staged", "--merge-base",
+    "--color", "--no-color", "--word-diff", "--color-words", "--color-moved", "-w", "--ignore-all-space",
+    "-b", "--ignore-space-change", "--ignore-blank-lines", "--unified", "-M", "--find-renames",
+    "--find-copies", "--diff-filter", "--relative", "--no-relative", "--exit-code", "--quiet", "--check",
+    "--minimal", "--patience", "--histogram", "-R", "--abbrev", "--full-index", "--binary",
+    "--no-ext-diff", "--no-textconv", "--no-prefix", "--src-prefix", "--dst-prefix", "-z", "--no-index",
+}
+_GIT_LOG_OPTS = _GIT_DIFF_OPTS | {
+    "--oneline", "--graph", "--decorate", "--no-decorate", "--all", "--branches", "--tags", "--remotes",
+    "-n", "--max-count", "--skip", "--since", "--until", "--after", "--before", "--author", "--committer",
+    "--grep", "-i", "--regexp-ignore-case", "--format", "--pretty", "--reverse", "--first-parent",
+    "--no-merges", "--merges", "--follow", "-S", "-G", "--date", "--abbrev-commit", "--left-right",
+    "--cherry-pick", "--boundary", "--topo-order", "--date-order", "--no-walk", "--full-history",
+}
+_CHECKED: dict[str, frozenset[str]] = {
+    "find": frozenset({
+        "-name", "-iname", "-path", "-ipath", "-wholename", "-iwholename", "-regex", "-iregex",
+        "-regextype", "-type", "-xtype", "-size", "-empty", "-mtime", "-mmin", "-atime", "-amin",
+        "-ctime", "-cmin", "-newer", "-anewer", "-cnewer", "-user", "-group", "-uid", "-gid",
+        "-nouser", "-nogroup", "-perm", "-links", "-inum", "-samefile", "-lname", "-ilname",
+        "-readable", "-writable", "-executable", "-maxdepth", "-mindepth", "-depth", "-prune",
+        "-print", "-print0", "-printf", "-ls", "-quit", "-true", "-false", "-not", "-a", "-and",
+        "-o", "-or", "-follow", "-L", "-H", "-P", "-xdev", "-mount", "-noleaf", "-daystart",
+    }),
+    "fd": frozenset({
+        "-H", "--hidden", "-I", "--no-ignore", "--no-ignore-vcs", "-u", "--unrestricted", "-s",
+        "--case-sensitive", "-i", "--ignore-case", "-g", "--glob", "--regex", "-F", "--fixed-strings",
+        "-a", "--absolute-path", "-L", "--follow", "-p", "--full-path", "-0", "--print0", "-d",
+        "--max-depth", "--min-depth", "--exact-depth", "-t", "--type", "-e", "--extension", "-E",
+        "--exclude", "-S", "--size", "--changed-within", "--changed-before", "--max-results", "-1",
+        "-q", "--quiet", "--prune", "--one-file-system", "-c", "--color",
+    }),
+    "rg": frozenset({
+        "--", "-i", "--ignore-case", "-s", "--case-sensitive", "-S", "--smart-case", "-w", "--word-regexp",
+        "-x", "--line-regexp", "-F", "--fixed-strings", "-e", "--regexp", "-n", "--line-number", "-N",
+        "--no-line-number", "-l", "--files-with-matches", "--files-without-match", "-c", "--count",
+        "--count-matches", "-o", "--only-matching", "-v", "--invert-match", "-g", "--glob", "--iglob",
+        "-t", "--type", "-T", "--type-not", "--hidden", "-u", "--unrestricted", "--no-ignore", "-L",
+        "--follow", "-A", "-B", "-C", "--context", "--after-context", "--before-context", "-m",
+        "--max-count", "-d", "--max-depth", "--files", "--json", "--vimgrep", "--heading",
+        "--no-heading", "--color", "-H", "--with-filename", "-I", "--no-filename", "-0", "--null",
+        "-U", "--multiline", "-P", "--pcre2", "--sort", "--sortr", "--stats", "--trim", "-q",
+        "--quiet", "--column", "-M", "--max-columns", "-a", "--text", "--type-list", "--no-messages",
+    }),
+    "tree": frozenset({
+        "-a", "-d", "-l", "-f", "-i", "-q", "-N", "-L", "-P", "-I", "--gitignore", "--noreport",
+        "-s", "-h", "--du", "-p", "-u", "-g", "-D", "-F", "-C", "-n", "-J", "-X", "--dirsfirst",
+        "--prune", "--matchdirs", "--filelimit", "-t", "-r", "-c", "-v", "-U", "--sort", "--charset",
+    }),
+    "file": frozenset({
+        "-b", "--brief", "-i", "--mime", "--mime-type", "--mime-encoding", "--extension", "-L",
+        "--dereference", "-h", "--no-dereference", "-k", "--keep-going", "-N", "--no-pad", "-0",
+        "-E", "-r", "--raw", "-s", "--special-files",
+    }),
+    "env": frozenset(),  # `env` alone prints the environment; `env <cmd>` runs <cmd>
+    "git diff": frozenset(_GIT_DIFF_OPTS),
+    "git log": frozenset(_GIT_LOG_OPTS),
+    "git show": frozenset(_GIT_LOG_OPTS),
+    "git branch": frozenset({
+        "-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--show-current", "--color",
+        "--no-color", "--column", "--no-column", "--format", "--sort", "--merged", "--no-merged",
+        "--contains", "--no-contains", "--points-at", "--list", "-i", "--ignore-case",
+    }),
+}
+# Commands whose positional arguments are not just paths or revisions.
+_NO_POSITIONAL = {"env"}
+# `git branch <name>` creates a branch; with --list, positionals are patterns.
+# (`-l` is not accepted: older git read it as --create-reflog.)
+_POSITIONAL_ONLY_WITH = {"git branch": {"--list"}}
+# Per command: numeric option values and attached counts that only read
+# (`-mtime -7`, `-size -10k`, `rg -A3`, `git log -n5`, `git diff -U3`).
+# Never a blanket pattern: `git branch -m5` renames a branch.
+_NUMERIC_TOKEN = {
+    "find": re.compile(r"^-\d+[a-zA-Z]?$"),
+    "rg": re.compile(r"^-[ABCmM]\d+$"),
+    "git diff": re.compile(r"^-(?:U\d+|M\d+%?)$"),
+    "git log": re.compile(r"^-(?:U\d+|M\d+%?|n?\d+)$"),
+    "git show": re.compile(r"^-(?:U\d+|M\d+%?|n?\d+)$"),
+}
+# For commands with option-dependent behaviour, brace expansion and globs can
+# turn an argument into an option (`{-delete,-print}`, `?delete` matching a
+# file named `-delete`); `*` is already a rule wildcard.
+_EXPANSION = re.compile(r"[?\[\]{}]")
+# Never a read, whatever an organisation policy says: they run another
+# program, interpret a script, open a pager or editor, or write their output.
+# Refused by prefix, so variants are refused too (`python3-dbg`, `nodejs`,
+# `fdfind`, `bundle`, `gtar3`).
+_REFUSED_FAMILIES = (
+    # shells
+    "sh", "bash", "rbash", "zsh", "dash", "ksh", "mksh", "fish", "csh", "tcsh", "ash", "busybox",
+    "pwsh", "powershell", "xonsh", "elvish",
+    # interpreters
+    "python", "pypy", "node", "deno", "bun", "ruby", "irb", "perl", "php", "lua", "tclsh", "wish",
+    "osascript", "rscript", "julia", "java", "jshell", "groovy",
+    # wrappers that run another command
+    "env", "xargs", "nohup", "sudo", "doas", "time", "timeout", "nice", "stdbuf", "watch", "setsid",
+    "chroot", "flock", "ionice", "taskset", "unbuffer", "parallel", "strace", "ltrace", "gdb",
+    "systemd-run", "pkexec", "runuser", "nsenter", "unshare", "script",
+    # search tools that run a program per result; package runners
+    "find", "fd", "pip",
+)
+_REFUSED_NAMES = (
+    "exec", "eval", "command", "builtin", "source",
+    "less", "more", "most", "man", "vim", "nvim", "view", "emacs", "nano",
+    "awk", "gawk", "mawk", "nawk", "sed", "gsed", "tee", "sort", "tar", "gtar", "bsdtar",
+    "open", "xdg-open", "npx", "bunx", "pnpx", "ssh", "curl", "wget",
+)
+# Names too short to refuse by prefix (`ex` would refuse `expr`): refused with
+# any version, debug or variant suffix.
+_REFUSED_SHORT = re.compile(r"^(?:ex|ed|su|nu|uv|dd|vi)(?:[-_.]?\d[\w.-]*|-?dbg|[wx])?$")
+# The only command names that can be a read: plain ASCII, lower case, no
+# path, no extension, no version dots, no glob.
+_PLAIN_NAME = re.compile(r"^[a-z][a-z0-9_-]*$")
+_POLICY_FORBIDDEN = re.compile(r"[*?\[\]{}/\\;&|<>`$()\n\r]")
+_BUILTIN_KEYS = [k.split() for k in (*_CHECKED, *_READ_ONLY_ANY_ARGS)]
+# Shell operators, redirections and substitutions: the rule runs more than the command.
+_SHELL_META = re.compile(r"[;&|<>`$()\n\r]")
+# Tool names include MCP server names, which may carry `-` and `.`.
+_RULE_RE = re.compile(r"^(?P<tool>[A-Za-z_][A-Za-z0-9_.-]*)(?:\((?P<spec>.*)\))?$", re.DOTALL)
 _MODE_TO_APPROVAL = {"allow": "auto", "ask": "ask"}
 
 
+def _match(words: list[str], table) -> int:
+    """How many leading words name a command in `table` (0 if none)."""
+    for n in (3, 2, 1):
+        if len(words) >= n and " ".join(words[:n]) in table and all(" " not in w for w in words[:n]):
+            return n
+    return 0
+
+
+def _command_name(word: str) -> str | None:
+    """The program a command word names: NFKC, case-folded, basename, no
+    `.exe`. None for anything that is not ASCII after that (`ſh` resolves to
+    sh on a case-insensitive file system)."""
+    name = unicodedata.normalize("NFKC", word).casefold()
+    if not name.isascii():
+        return None
+    name = name.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    return name.removesuffix(".exe")
+
+
+def _refused(name: str) -> bool:
+    return name.startswith(_REFUSED_FAMILIES) or name.startswith(_REFUSED_NAMES) or bool(_REFUSED_SHORT.match(name))
+
+
+def _review_policy(pol: policy.Policy) -> tuple[set[str], list[tuple[str, str]]]:
+    """Split `read_only_commands` into accepted entries and ignored ones, with
+    the reason. Deny by default: an entry counts only if its command is a
+    plain ASCII name outside the refused families and it does not touch a
+    built-in command."""
+    keep: set[str] = set()
+    ignored: list[tuple[str, str]] = []
+    for entry in pol.read_only_commands:
+        words = entry.split()
+        if not words or not entry.isascii() or _POLICY_FORBIDDEN.search(entry):
+            ignored.append((entry, "not a plain command: no paths, globs, shell syntax or non-ASCII"))
+        elif not _PLAIN_NAME.match(words[0]):
+            ignored.append((entry, "command name must match ^[a-z][a-z0-9_-]*$"))
+        elif _refused(words[0]):
+            ignored.append((entry, "runs other programs, interprets scripts, pages, edits or writes"))
+        elif _match(words, _CHECKED) or any(len(k) > len(words) and k[: len(words)] == words for k in _BUILTIN_KEYS):
+            ignored.append((entry, "cannot widen a built-in command"))
+        else:
+            keep.add(" ".join(words))
+    return keep, ignored
+
+
+def ignored_policy_entries(pol: policy.Policy | None = None) -> list[tuple[str, str]]:
+    """(entry, reason) for every `read_only_commands` entry that is ignored."""
+    return _review_policy(pol or policy.current())[1]
+
+
+def _options_read_only(key: str, args: list[str]) -> bool:
+    allowed = _CHECKED[key]
+    positional = [a for a in args if not a.startswith("-") or a == "-"]
+    if positional and key in _NO_POSITIONAL:
+        return False
+    if positional and key in _POSITIONAL_ONLY_WITH and not _POSITIONAL_ONLY_WITH[key] & set(args):
+        return False
+    for a in args:
+        if not a.startswith("-") or a == "-":
+            continue
+        numeric = _NUMERIC_TOKEN.get(key)
+        if a.split("=", 1)[0] in allowed or (numeric is not None and numeric.match(a)):
+            continue
+        return False
+    return True
+
+
 def _bash_class(spec: str | None) -> tuple[ToolAccess, bool]:
-    """(class, scoped) for a Bash rule specifier."""
+    """(class, scoped) for a Bash rule specifier. Deny by default."""
     if not spec or spec.strip() in ("*", ":*"):
         return ToolAccess.EXECUTE, False
-    cmd = spec.split(":", 1)[0].strip()
-    words = cmd.split()
-    read_only = _READ_ONLY_COMMANDS | set(policy.current().read_only_commands)
-    for n in (3, 2, 1):
-        if " ".join(words[:n]) in read_only:
-            return ToolAccess.READ, True
+    cmd = spec.strip()
+    wildcard = cmd.endswith(":*")  # legacy prefix syntax: `Bash(git status:*)`
+    if wildcard:
+        cmd = cmd[:-2]
+    wildcard = wildcard or "*" in cmd  # `*` anywhere matches any text, options included
+    if _SHELL_META.search(cmd):
+        return ToolAccess.EXECUTE, True
+    try:
+        words = shlex.split(cmd)
+    except ValueError:
+        return ToolAccess.EXECUTE, True
+    if not words:
+        return ToolAccess.EXECUTE, True
+    # Only a plain command name can be a read. `git.exe`, `/usr/bin/env`,
+    # `python3.12`, `LS` and `ſh` are execute, whatever they resolve to.
+    name = _command_name(words[0])
+    if name is None or not _PLAIN_NAME.match(words[0]):
+        return ToolAccess.EXECUTE, True
+    # Built-in knowledge first, so a policy entry cannot widen a risky command.
+    n = _match(words, _CHECKED)
+    if n:
+        key = " ".join(words[:n])
+        ok = not wildcard and not _EXPANSION.search(cmd) and _options_read_only(key, words[n:])
+        return (ToolAccess.READ if ok else ToolAccess.EXECUTE), True
+    if _refused(name):
+        return ToolAccess.EXECUTE, True
+    if name == "git" and len(words) > 1 and words[1].startswith("-"):
+        return ToolAccess.EXECUTE, True  # global options: -c core.pager=…, --exec-path, -C
+    accepted, _ = _review_policy(policy.current())
+    if _match(words, _READ_ONLY_ANY_ARGS | accepted):
+        return ToolAccess.READ, True
     return ToolAccess.EXECUTE, True
 
 
@@ -165,6 +389,11 @@ class ClaudeSettingsScanner(Scanner):
             for rule in perms.get(mode) or []:
                 m = _RULE_RE.match(str(rule))
                 if not m:
+                    # Never drop a grant we cannot parse: it is UNKNOWN, not absent.
+                    line = _line_of(text, str(rule).splitlines()[0] if str(rule) else str(rule))
+                    obs.tools.append(Tool(name=f"claude-code.{rule}", type=ToolAccess.UNKNOWN, system="claude-code", source=f"{rel_path}:{line}", approval=_MODE_TO_APPROVAL[mode]))
+                    obs.unknowns.append(str(rule))
+                    notes.append(f"{mode} {rule}: unparsed rule -> UNKNOWN")
                     continue
                 tool, spec = m.group("tool"), m.group("spec")
                 if tool in denied_tools:
@@ -222,5 +451,7 @@ class ClaudeSettingsScanner(Scanner):
             )
             notes.append("defaultMode=acceptEdits: file edits run without approval")
 
+        for entry, reason in ignored_policy_entries():
+            notes.append(f"policy read_only_commands entry {entry!r} ignored: {reason}")
         source.note = "; ".join(notes) if notes else "no rules"
         return obs

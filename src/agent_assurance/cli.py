@@ -160,6 +160,10 @@ def _validate_policy(path: str) -> int:
     print(f"ok: {path} is a valid {policy.API_VERSION} policy")
     print(f"    name={pol.name} sha256={pol.sha256}")
     print(f"    overrides: {_policy_override_summary(pol)}")
+    from .scan.claude_settings import ignored_policy_entries
+
+    for entry, reason in ignored_policy_entries(pol):
+        print(f"    warning: read_only_commands entry {entry!r} ignored: {reason}")
     return EXIT_OK
 
 

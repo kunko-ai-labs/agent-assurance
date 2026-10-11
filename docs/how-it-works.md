@@ -42,11 +42,19 @@ Schema: [`schema/agent-assurance.schema.json`](../schema/agent-assurance.schema.
 | `Edit`, `Write`, `MultiEdit`, `NotebookEdit` | write | +2 points if `allow` and unscoped |
 | `Bash`, `Bash(*)` | execute, unscoped | +2 points if `allow`; breaks a promise of autonomy ≤ L2 |
 | `Bash(git status:*)`, `Bash(grep:*)`, `Bash(ls:*)`… | read (scoped) | read-only commands are not "the agent runs shell unattended" |
+| `Bash(find:*)`, `Bash(git diff:*)`, `Bash(rg:*)`, `Bash(env:*)`… | execute (scoped) | these commands run programs or write files with some options (`find -exec`, `git diff --output`, `rg --pre`, `env <cmd>`); only an exact rule whose every option only reads is a read |
+| a rule with `;`, `&&`, `\|`, `>`, `<`, `$`, backticks or parentheses | execute (scoped) | the rule runs more than the listed command |
 | `Bash(npm test:*)`, any other scoped command | execute (scoped) | no auto-approval penalty; AA-002 says *review*, not *broken* |
 | `Agent`, `Task` | execute (subagents) | |
 | `mcp__<server>__<tool>`, `mcp__<server>` | the server's widest class from the catalogue | a single tool is scoped; a whole server is not |
 | `defaultMode: acceptEdits` / `bypassPermissions` | write / execute, auto-approved | |
-| anything else | unknown | scored as write, never as safe |
+| anything else, or a rule that does not parse | unknown | scored as write, never as safe |
+
+What the read-only classification assumes and does not see:
+
+- A wildcard rule for a command that reads with any arguments (`Bash(cat:*)`, `Bash(grep:*)`, `Bash(echo:*)`) is a read only because Claude Code refuses to extend a prefix rule over shell operators and redirections (`cat a | sh`, `echo x > ~/.bashrc`) at run time. The scanner checks the rule text, not the text the wildcard later matches.
+- Behaviour set by the user's environment or git configuration (pagers, `diff.external`, textconv drivers) is not visible in a rule. `gh … view` and `gh … list` rules allow `--web`, which opens the browser on a GitHub page; this is counted as a read.
+- Only a plain command name can be a read: a path, an extension, a version suffix, upper case or non-ASCII (`/usr/bin/find`, `git.exe`, `python3.12`, `LS`, `ſh`) makes the rule execute, and so does `git` followed by a global option (`-c`, `-C`, `--exec-path`).
 
 **Serialized tool definitions** (business agents) — `agent-tools.json|yaml` at the root, plus any file listed in the policy's `tool_definition_files`: OpenAI function tools, OpenAI Agents SDK, MCP tool objects, Claude client tools, LangChain / LangGraph / CrewAI serialized metadata. A tool definition has a name and a description, not an access class, so the class is **inferred** from verbs (`refund` → financial, `delete` → delete, `send` → external_send, `run` → execute, `update` → write, `search` → read; anything else UNKNOWN) and the tool is marked `inferred`. It scores like its class, but AA-002 reports an undeclared inferred class as *review*, never *broken*: a guess must not fail a build. Nothing is imported or executed.
 
@@ -82,7 +90,7 @@ gate: { review_bands: [MEDIUM], fail_bands: [HIGH, CRITICAL] }  # stricter than 
 promise:
   breaking_access: [write, delete, execute, financial]           # external_send only reviews here
   breaking_data: [pii, health, credential]
-read_only_commands: [make lint, poetry run pytest]              # added to the built-in list
+read_only_commands: [make lint, poetry run pytest]              # added to the built-in list; see below for what it cannot add
 catalog:                                                        # your own MCP servers: no longer UNKNOWN
   - system: acme-erp
     aliases: [acme-erp]
@@ -92,6 +100,8 @@ catalog:                                                        # your own MCP s
     source: "platform team: ERP MCP v2 is read-only"
 tool_definition_files: [agents/tools.yaml]
 ```
+
+`read_only_commands` adds commands that read with any arguments. It is deny by default: an entry counts only if its command name is plain ASCII matching `^[a-z][a-z0-9_-]*$` (no path, extension, version dots, glob or shell syntax) and is outside the refused families: shells, interpreters (`python*`, `node*`, `perl*`…), wrappers that run another command (`env`, `xargs`, `sudo`, `timeout`…), pagers, editors, programs that write their output (`sed`, `tee`, `tar`…), and `find`/`fd`. An entry can never widen a command that has a built-in option allow-list (`find`, `fd`, `rg`, `tree`, `file`, `env`, `git diff/log/show/branch`) or be a bare prefix of a built-in command (`git`, `gh pr`). Every ignored entry is reported, with its reason, by `validate` and in the scan's source notes. The policy file is read from the scanned tree, so a change to it also shows in the report's policy name and sha256.
 
 No policy = the built-in model, exactly (asserted in tests). With a policy, every report, card and attestation records its name and sha256: a verdict is reproducible only with the policy that produced it. Example: [`examples/repos/policy-org`](../examples/repos/policy-org).
 

@@ -36,12 +36,14 @@ Welcome. A fork PR runs with a read-only token, so two things behave differently
 
 ## Branches
 
-- `main` — releasable at all times. Only merges from `develop` (or hotfixes). Every release is a tag `vX.Y.Z` plus a moving `vX.Y` for the Action.
-- `develop` — integration branch. Day-to-day work lands here through feature branches.
-- `feat/*`, `fix/*`, `docs/*` — short-lived; open a PR into `develop`. The CI (`ci.yml`) and the dogfood (`assurance.yml`) run on every PR.
-- `demo/*` — living demos that must stay red (see PR #16). Never merged.
+Changes flow in one direction, `develop` → `staging` → `main`, and each step is a reviewed pull request.
 
-Release: `develop` → PR → `main` → bump version in `pyproject.toml` and `__init__.py` → tag → GitHub release with notes → move the `vX.Y` tag.
+- `develop` is where contributions land. Open your pull request from a `feat/*`, `fix/*` or `docs/*` branch into `develop`. The CI (`ci.yml`) and the dogfood (`assurance.yml`) run on every PR.
+- `staging` holds what the maintainers have accepted for the next release. They bring changes over from `develop` one by one, after review. A change in `develop` is not automatically in the next release.
+- `main` is the release branch, and it is releasable at all times. It accepts pull requests only from `staging`, or from a maintainer's `hotfix/*` branch. A required check (`branch-flow.yml`) enforces this, and only the maintainer merges into `main`. Every release is a tag `vX.Y.Z` plus a moving `vX.Y` for the Action.
+- `demo/*` branches are living demos that must stay red (see PR #16). They are never merged.
+
+Release: `staging` → PR → `main` → bump version in `pyproject.toml` and `__init__.py` → tag → GitHub release with notes → move the `vX.Y` tag. Security fixes are prepared privately in a security advisory and reach `main` as a hotfix.
 
 ## Before you push
 

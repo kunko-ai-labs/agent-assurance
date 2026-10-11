@@ -5,7 +5,7 @@
 ```bash
 pipx install agent-assurance              # from PyPI
 pipx install "agent-assurance[mcp]"       # with the MCP server
-pipx install git+https://github.com/kunko-ai-labs/agent-assurance@v0.6.0   # or pinned to a release tag
+pipx install git+https://github.com/kunko-ai-labs/agent-assurance@v0.6.1   # or pinned to a release tag
 ```
 
 Releases ship a wheel and an sdist with Sigstore build provenance (`gh attestation verify agent_assurance-*.whl -R kunko-ai-labs/agent-assurance`).

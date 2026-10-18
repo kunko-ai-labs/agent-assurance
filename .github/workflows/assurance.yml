@@ -221,3 +221,112 @@ jobs:
         run: |
           echo "::error::scan did NOT block an undeclared credential from .codex/config.toml"; exit 1
       - run: grep -q "inferred from its name" aa-report.md
+
+  scan-unknown-server:
+    name: scan — unverifiable promise (REVIEW, never PASS; blocks with fail-on=review)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: fail-on=fail continues on REVIEW, by choice
+        id: lenient
+        uses: ./
+        with:
+          mode: scan
+          directory: examples/repos/mcp-unknown-server
+      - name: fail-on=review must block
+        id: strict
+        continue-on-error: true
+        uses: ./
+        with:
+          mode: scan
+          directory: examples/repos/mcp-unknown-server
+          fail-on: review
+      - name: Assert the verdict was REVIEW both times and only the strict gate tripped
+        env:
+          LENIENT: ${{ steps.lenient.outputs.verdict }}/${{ steps.lenient.outputs.gate }}
+          STRICT: ${{ steps.strict.outputs.verdict }}/${{ steps.strict.outputs.gate }}/${{ steps.strict.outcome }}
+        run: |
+          echo "lenient=$LENIENT strict=$STRICT"
+          test "$LENIENT" = "REVIEW/open" && test "$STRICT" = "REVIEW/tripped/failure"
+
+  invalid-inputs-fail:
+    name: invalid gate inputs (must fail before scanning)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: A typo in fail-on must not open the gate
+        id: failon
+        continue-on-error: true
+        uses: ./
+        with:
+          manifest: examples/dangerous-agent.yaml
+          fail-on: warn
+      - name: A typo in mode must not run another mode
+        id: mode
+        continue-on-error: true
+        uses: ./
+        with:
+          mode: scna
+          manifest: examples/safe-agent.yaml
+      - name: Assert both runs failed
+        env:
+          OUTCOMES: ${{ steps.failon.outcome }}/${{ steps.mode.outcome }}
+        run: test "$OUTCOMES" = "failure/failure"
+
+  hostile-inputs:
+    name: inputs are data (spaces, quotes, $(), backticks, ;, newline, leading -)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Copy a kept-promise fixture under hostile directory names
+        run: |
+          {
+            echo "AA_SHELL=aa dir 'q' \"dq\" \$(touch pwned-subst) \`touch pwned-tick\`; touch pwned-semi"
+            echo "AA_DASH=-leading-dash"
+            echo "AA_NEWLINE<<AA_EOF"
+            printf 'line1\nline2\n'
+            echo "AA_EOF"
+          } >> "$GITHUB_ENV"
+      - name: Create the directories
+        run: |
+          for d in "$AA_SHELL" "$AA_DASH" "$AA_NEWLINE"; do
+            mkdir -p -- "$d"
+            cp -R examples/repos/mcp-promise-kept/. "$d/"
+          done
+      - name: Shell metacharacters
+        id: shell
+        uses: ./
+        with:
+          mode: scan
+          directory: ${{ env.AA_SHELL }}
+          manifest: ${{ env.AA_SHELL }}/agent-assurance.yaml
+          fail-on: review
+          sarif: ${{ env.AA_SHELL }}.sarif
+          card: aa card $(touch pwned-card).html
+          attest: write
+      - name: Leading dash
+        id: dash
+        uses: ./
+        with:
+          mode: scan
+          directory: ${{ env.AA_DASH }}
+          manifest: ${{ env.AA_DASH }}/agent-assurance.yaml
+          fail-on: review
+      - name: Newline
+        id: newline
+        uses: ./
+        with:
+          mode: scan
+          directory: ${{ env.AA_NEWLINE }}
+          manifest: ${{ env.AA_NEWLINE }}/agent-assurance.yaml
+          fail-on: review
+      - name: Assert every run passed, wrote its files and executed nothing
+        env:
+          VERDICTS: ${{ steps.shell.outputs.verdict }}/${{ steps.dash.outputs.verdict }}/${{ steps.newline.outputs.verdict }}
+        run: |
+          echo "verdicts=$VERDICTS"
+          test "$VERDICTS" = "PASS/PASS/PASS"
+          test -s "$AA_SHELL.sarif"
+          test -s 'aa card $(touch pwned-card).html'
+          test -s aa-attestation.json
+          if find . -name 'pwned*' | grep -q .; then echo "::error::an input was executed"; exit 1; fi

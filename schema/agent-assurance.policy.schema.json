@@ -1,7 +1,7 @@
 {
   "$defs": {
     "Bands": {
-      "description": "Lower bound of each band; LOW starts at 0.",
+      "description": "Lower bound of each band; LOW starts at 0. The bounds must rise strictly: 0 < medium < high < critical.",
       "properties": {
         "medium": {
           "default": 8,
@@ -38,31 +38,37 @@
       "properties": {
         "public": {
           "default": 0,
+          "minimum": 0,
           "title": "Public",
           "type": "integer"
         },
         "internal": {
           "default": 1,
+          "minimum": 0,
           "title": "Internal",
           "type": "integer"
         },
         "pii": {
           "default": 3,
+          "minimum": 0,
           "title": "Pii",
           "type": "integer"
         },
         "health": {
           "default": 4,
+          "minimum": 0,
           "title": "Health",
           "type": "integer"
         },
         "financial": {
           "default": 4,
+          "minimum": 0,
           "title": "Financial",
           "type": "integer"
         },
         "credential": {
           "default": 5,
+          "minimum": 0,
           "title": "Credential",
           "type": "integer"
         }
@@ -74,6 +80,12 @@
       "properties": {
         "review_bands": {
           "items": {
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ],
             "type": "string"
           },
           "title": "Review Bands",
@@ -81,6 +93,12 @@
         },
         "fail_bands": {
           "items": {
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ],
             "type": "string"
           },
           "title": "Fail Bands",
@@ -88,7 +106,8 @@
         }
       },
       "title": "Gate",
-      "type": "object"
+      "type": "object",
+      "description": "Band names are LOW, MEDIUM, HIGH, CRITICAL. A band may not be in both lists, and the gate may not weaken as risk rises: above a failing band every band fails; above a reviewed band every band is reviewed or fails."
     },
     "PolicyCapability": {
       "properties": {
@@ -177,6 +196,8 @@
         },
         "max_autonomy_with_human": {
           "default": 2,
+          "maximum": 5,
+          "minimum": 0,
           "title": "Max Autonomy With Human",
           "type": "integer"
         }
@@ -201,36 +222,43 @@
       "properties": {
         "read": {
           "default": 1,
+          "minimum": 0,
           "title": "Read",
           "type": "integer"
         },
         "execute": {
           "default": 3,
+          "minimum": 0,
           "title": "Execute",
           "type": "integer"
         },
         "write": {
           "default": 3,
+          "minimum": 0,
           "title": "Write",
           "type": "integer"
         },
         "external_send": {
           "default": 3,
+          "minimum": 0,
           "title": "External Send",
           "type": "integer"
         },
         "delete": {
           "default": 5,
+          "minimum": 0,
           "title": "Delete",
           "type": "integer"
         },
         "financial": {
           "default": 5,
+          "minimum": 0,
           "title": "Financial",
           "type": "integer"
         },
         "unknown": {
           "default": 3,
+          "minimum": 0,
           "title": "Unknown",
           "type": "integer"
         }
@@ -248,26 +276,31 @@
         },
         "production": {
           "default": 5,
+          "minimum": 0,
           "title": "Production",
           "type": "integer"
         },
         "irreversible": {
           "default": 5,
+          "minimum": 0,
           "title": "Irreversible",
           "type": "integer"
         },
         "delegation": {
           "default": 3,
+          "minimum": 0,
           "title": "Delegation",
           "type": "integer"
         },
         "autonomy_per_level": {
           "default": 2,
+          "minimum": 0,
           "title": "Autonomy Per Level",
           "type": "integer"
         },
         "auto_approval": {
           "default": 2,
+          "minimum": 0,
           "title": "Auto Approval",
           "type": "integer"
         }

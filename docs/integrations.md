@@ -56,9 +56,24 @@ steps:
       sarif: aa.sarif        # optional
       upload-sarif: "true"   # optional
       card: aa-card.html     # optional: capability card artifact
-      attest: write          # optional: in-toto evidence ('sign' = Sigstore, needs id-token/attestations: write)
+      attest: write          # optional: unsigned in-toto evidence; 'sign' also signs it with Sigstore (needs id-token/attestations: write)
       policy: agent-assurance.policy.yaml   # optional
 ```
+
+What the Action does with each result:
+
+| Result | `verdict` output | `fail-on: fail` (default) | `fail-on: review` |
+|---|---|---|---|
+| PASS | `PASS` | job continues | job continues |
+| REVIEW (incl. an `UNKNOWN` capability or a promise that cannot be verified) | `REVIEW` | job continues, with a warning: a deliberate choice of this setting | job fails |
+| FAIL | `FAIL` | job fails | job fails |
+| No verdict (invalid input, missing manifest, no report, CLI error) | `ERROR` | job fails | job fails |
+
+In `diff` mode the verdict is the head side's, and `fail-on-delta: "true"` (default) also fails the job when reach grows, the band rises or the promise breaks. The `gate` output is `tripped` or `open`. Invalid values for `mode`, `fail-on`, `fail-on-delta`, `attest` or `check` stop the run before anything is scanned.
+
+Every input reaches the Action's shell steps as an environment variable and is passed to the CLI as one argument: a value with spaces, quotes, `$(...)`, backticks, `;`, newlines or a leading `-` is a path or a name, never code or an option. `tests/test_action_inputs.py` runs the Action's steps with such values.
+
+`attest: write` writes the statement; it is not signed. Only `attest: sign` signs it, through `actions/attest`.
 
 The markdown report lands in the job summary; in `diff` mode one PR comment is created and then updated on every push. This repo's own [`assurance.yml`](../.github/workflows/assurance.yml) asserts that the Action passes what it should and blocks what it should — a green run means the gate still works.
 

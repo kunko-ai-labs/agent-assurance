@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import pathlib
 
+import pytest
+
 from agent_assurance import cli, policy, risk
 from agent_assurance.manifest import Manifest
 from agent_assurance.scan import catalog
@@ -156,3 +158,44 @@ def test_validate_still_validates_a_manifest_and_requires_a_target(tmp_path, cap
     both = cli.main(["validate", str(manifest), "--policy", str(manifest)])
     assert both == cli.EXIT_USAGE
     assert "not both" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [
+        ("weights: {tools: {write: -3}}", "greater than or equal to 0"),
+        ("weights: {data: {credential: -1}}", "greater than or equal to 0"),
+        ("weights: {production: -5}", "greater than or equal to 0"),
+        ("bands: {medium: 20, high: 16}", "band bounds must rise strictly"),
+        ("bands: {high: 28, critical: 28}", "band bounds must rise strictly"),
+        ("bands: {medium: 0}", "band bounds must rise strictly"),
+        ("gate: {fail_bands: [critical]}", "unknown band 'critical'"),
+        ("gate: {review_bands: [HIGHT]}", "unknown band 'HIGHT'"),
+        ("gate: {review_bands: [HIGH], fail_bands: [HIGH, CRITICAL]}", "HIGH are in both"),
+        ("gate: {review_bands: [], fail_bands: [HIGH]}", "HIGH fails but CRITICAL"),
+        ("gate: {review_bands: [MEDIUM], fail_bands: [CRITICAL]}", "MEDIUM is gated but HIGH"),
+        ("promise: {max_autonomy_with_human: 9}", "less than or equal to 5"),
+    ],
+)
+def test_contradictory_policies_are_refused(tmp_path, capsys, body, message):
+    """A policy that could open the gate by mistake is a usage error, never a quieter run."""
+    pol = tmp_path / "p.yaml"
+    pol.write_text(f"apiVersion: agent-assurance/policy/v1\n{body}\n", encoding="utf-8")
+    assert cli.main(["validate", "--policy", str(pol)]) == cli.EXIT_USAGE
+    assert message in capsys.readouterr().err
+    assert cli.main(["scan", str(KEPT), "--policy", str(pol)]) == cli.EXIT_USAGE
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "gate: {review_bands: [MEDIUM], fail_bands: [HIGH, CRITICAL]}",
+        "gate: {review_bands: [LOW, MEDIUM, HIGH, CRITICAL], fail_bands: []}",
+        "gate: {review_bands: [], fail_bands: []}",
+        "bands: {medium: 1, high: 2, critical: 3}",
+    ],
+)
+def test_consistent_gates_and_bands_are_accepted(tmp_path, body):
+    pol = tmp_path / "p.yaml"
+    pol.write_text(f"apiVersion: agent-assurance/policy/v1\n{body}\n", encoding="utf-8")
+    assert cli.main(["validate", "--policy", str(pol)]) == cli.EXIT_OK

@@ -21,7 +21,7 @@ import hashlib
 import os
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, NonNegativeInt, ValidationError, model_validator
 
 from .manifest import DataClass, ManifestError, ToolAccess
 
@@ -30,25 +30,25 @@ DEFAULT_FILE = "agent-assurance.policy.yaml"
 
 
 class ToolWeights(BaseModel):
-    read: int = 1
-    execute: int = 3
-    write: int = 3
-    external_send: int = 3
-    delete: int = 5
-    financial: int = 5
-    unknown: int = 3
+    read: NonNegativeInt = 1
+    execute: NonNegativeInt = 3
+    write: NonNegativeInt = 3
+    external_send: NonNegativeInt = 3
+    delete: NonNegativeInt = 5
+    financial: NonNegativeInt = 5
+    unknown: NonNegativeInt = 3
 
     def as_map(self) -> dict[ToolAccess, int]:
         return {ToolAccess(k): v for k, v in self.model_dump().items()}
 
 
 class DataWeights(BaseModel):
-    public: int = 0
-    internal: int = 1
-    pii: int = 3
-    health: int = 4
-    financial: int = 4
-    credential: int = 5
+    public: NonNegativeInt = 0
+    internal: NonNegativeInt = 1
+    pii: NonNegativeInt = 3
+    health: NonNegativeInt = 4
+    financial: NonNegativeInt = 4
+    credential: NonNegativeInt = 5
 
     def as_map(self) -> dict[DataClass, int]:
         return {DataClass(k): v for k, v in self.model_dump().items()}
@@ -57,11 +57,11 @@ class DataWeights(BaseModel):
 class Weights(BaseModel):
     tools: ToolWeights = Field(default_factory=ToolWeights)
     data: DataWeights = Field(default_factory=DataWeights)
-    production: int = 5
-    irreversible: int = 5
-    delegation: int = 3
-    autonomy_per_level: int = 2  # above L2
-    auto_approval: int = 2  # non-read, unscoped, no human in the loop
+    production: NonNegativeInt = 5
+    irreversible: NonNegativeInt = 5
+    delegation: NonNegativeInt = 3
+    autonomy_per_level: NonNegativeInt = 2  # above L2
+    auto_approval: NonNegativeInt = 2  # non-read, unscoped, no human in the loop
 
 
 class Bands(BaseModel):
@@ -71,13 +71,50 @@ class Bands(BaseModel):
     high: int = 16
     critical: int = 28
 
+    @model_validator(mode="after")
+    def _ascending(self) -> Bands:
+        # Overlapping or reversed bounds would make a band unreachable.
+        if not 0 < self.medium < self.high < self.critical:
+            raise ValueError(
+                f"band bounds must rise strictly: 0 < medium < high < critical "
+                f"(got medium={self.medium}, high={self.high}, critical={self.critical})"
+            )
+        return self
+
     def table(self) -> list[tuple[int, str]]:
         return [(0, "LOW"), (self.medium, "MEDIUM"), (self.high, "HIGH"), (self.critical, "CRITICAL")]
+
+
+BAND_ORDER = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 
 
 class Gate(BaseModel):
     review_bands: list[str] = Field(default_factory=lambda: ["HIGH"])
     fail_bands: list[str] = Field(default_factory=lambda: ["CRITICAL"])
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Gate:
+        """A gate that a typo or an ordering mistake could open is refused.
+
+        An unknown band name would never match, so the band it meant would pass.
+        A band in both lists is ambiguous. And the gate must not weaken as risk
+        rises: above a failing band every band fails, and above a reviewed band
+        every band is reviewed or fails.
+        """
+        for name in self.review_bands + self.fail_bands:
+            if name not in BAND_ORDER:
+                raise ValueError(f"unknown band {name!r} in gate (expected one of {', '.join(BAND_ORDER)})")
+        both = sorted(set(self.review_bands) & set(self.fail_bands), key=BAND_ORDER.index)
+        if both:
+            raise ValueError(f"band(s) {', '.join(both)} are in both review_bands and fail_bands")
+        gated = set(self.review_bands) | set(self.fail_bands)
+        for i, name in enumerate(BAND_ORDER):
+            for above in BAND_ORDER[i + 1 :]:
+                if name in self.fail_bands and above not in self.fail_bands:
+                    raise ValueError(f"{name} fails but {above}, a higher band, does not")
+                if name in gated and above not in gated:
+                    raise ValueError(f"{name} is gated but {above}, a higher band, is not")
+        return self
 
 
 class Promise(BaseModel):
@@ -94,7 +131,7 @@ class Promise(BaseModel):
         default_factory=lambda: [DataClass.PII, DataClass.HEALTH, DataClass.FINANCIAL, DataClass.CREDENTIAL]
     )
     # Declared autonomy at or below this means "a human approves actions".
-    max_autonomy_with_human: int = 2
+    max_autonomy_with_human: int = Field(default=2, ge=0, le=5)
 
 
 class PolicyCapability(BaseModel):

@@ -65,7 +65,13 @@ argv = sys.argv[1:]
 with open(os.environ["AA_ARGV_LOG"], "a", encoding="utf-8") as fh:
     fh.write(json.dumps(["gh"] + argv) + "\\n")
 if argv[:1] == ["api"] and "--paginate" in argv:
-    print(json.dumps([{"id": 1, "body": "unrelated"}, {"id": 42, "body": os.environ["AA_EXISTING_BODY"]}]))
+    bot = {"login": "github-actions[bot]"}
+    comments = [{"id": 1, "user": bot, "body": "unrelated"}]
+    if os.environ.get("AA_THIRD_PARTY_BODY"):
+        comments.append({"id": 13, "user": {"login": "someone"}, "body": os.environ["AA_THIRD_PARTY_BODY"]})
+    if os.environ.get("AA_EXISTING_BODY"):
+        comments.append({"id": 42, "user": bot, "body": os.environ["AA_EXISTING_BODY"]})
+    print(json.dumps(comments))
 """
 
 
@@ -299,6 +305,57 @@ def test_invalid_gate_inputs_are_usage_errors(tmp_path, name, value):
     assert run.canaries(tmp_path) == []
 
 
+def test_a_third_party_comment_with_the_marker_is_never_edited(tmp_path):
+    if shutil.which("jq") is None:
+        pytest.skip("jq is needed for the comment step")
+    run = Runner(tmp_path)
+    (run.work / "aa-report.md").write_text("report", encoding="utf-8")
+    marker = "<!-- agent-assurance:. -->"
+    env = {"REPO": "o/r", "PR": "7", "GH_TOKEN": "x", "AA_THIRD_PARTY_BODY": marker + "\nfake PASS"}
+    proc, _ = run.step("Comment on the pull request (mode: diff)", {}, env)
+    assert proc.returncode == 0, proc.stderr
+    calls = run.calls()
+    assert not any("PATCH" in c for c in calls)
+    assert ["gh", "pr", "comment", "7", "--body-file", "aa-comment.md"] in calls
+
+    # With the bot's own comment present as well, the bot's is the one updated.
+    run.log.write_text("", encoding="utf-8")
+    proc, _ = run.step("Comment on the pull request (mode: diff)", {}, {**env, "AA_EXISTING_BODY": marker + "\nold"})
+    assert proc.returncode == 0, proc.stderr
+    patches = [c for c in run.calls() if "PATCH" in c]
+    assert patches == [["gh", "api", "-X", "PATCH", "repos/o/r/issues/comments/42", "-F", "body=@aa-comment.md"]]
+
+
+@pytest.mark.parametrize("value", ["TRUE", "True", "False", "FALSE", "true", "false"])
+@pytest.mark.parametrize("name", ["comment", "upload-sarif"])
+def test_non_gate_booleans_follow_the_case_insensitive_if(tmp_path, name, value):
+    """GitHub's `if:` compares strings without case, so TRUE posts; no false warning."""
+    proc, _ = Runner(tmp_path).step("Validate inputs", {name: value})
+    assert proc.returncode == 0 and proc.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "directory",
+    ["..", "../other", "a/../../b", "a/..", "/etc", "/", "//x"],
+)
+def test_diff_directory_must_stay_inside_the_base_tree(tmp_path, directory):
+    run = Runner(tmp_path)
+    proc, _ = run.step("Validate inputs", {"mode": "diff", "directory": directory})
+    assert proc.returncode == 2
+    assert "::error::agent-assurance: input 'directory'" in proc.stdout
+
+
+@pytest.mark.parametrize("directory", [".", "sub/dir", "a..b", "..hidden", "-dash"])
+def test_diff_directory_inside_the_tree_is_accepted(tmp_path, directory):
+    proc, _ = Runner(tmp_path).step("Validate inputs", {"mode": "diff", "directory": directory})
+    assert proc.returncode == 0, proc.stdout
+
+
+def test_scan_directory_is_not_restricted(tmp_path):
+    proc, _ = Runner(tmp_path).step("Validate inputs", {"mode": "scan", "directory": "/abs/../path"})
+    assert proc.returncode == 0
+
+
 @pytest.mark.parametrize("name", ["comment", "upload-sarif"])
 def test_non_gate_booleans_warn_but_keep_their_meaning(tmp_path, name):
     run = Runner(tmp_path)
@@ -384,7 +441,8 @@ def test_missing_manifest_is_an_error_not_a_pass(tmp_path):
         ({"AA_STUB_VERDICT": "FAIL"}, 0, "FAIL", "tripped"),
         # A crash (exit 1 without output) is an error.
         ({"AA_STUB_WRITE": "0", "AA_STUB_EXIT": "1"}, 2, "ERROR", "tripped"),
-        ({"AA_STUB_EXIT": "2"}, 2, "PASS", "tripped"),
+        # A usage error is ERROR even when a report with a verdict was written.
+        ({"AA_STUB_EXIT": "2"}, 2, "ERROR", "tripped"),
     ],
     ids=["no-output", "unknown-verdict", "fail-exit-0", "crash", "usage"],
 )

@@ -291,7 +291,7 @@ jobs:
         run: |
           for d in "$AA_SHELL" "$AA_DASH" "$AA_NEWLINE"; do
             mkdir -p -- "$d"
-            cp -R examples/repos/mcp-promise-kept/. "$d/"
+            cp -R -- examples/repos/mcp-promise-kept/. "$d/"
           done
       - name: Shell metacharacters
         id: shell
@@ -326,7 +326,7 @@ jobs:
         run: |
           echo "verdicts=$VERDICTS"
           test "$VERDICTS" = "PASS/PASS/PASS"
-          test -s "$AA_SHELL.sarif"
+          test -s "./$AA_SHELL.sarif"
           test -s 'aa card $(touch pwned-card).html'
           test -s aa-attestation.json
           if find . -name 'pwned*' | grep -q .; then echo "::error::an input was executed"; exit 1; fi

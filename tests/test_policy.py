@@ -199,3 +199,27 @@ def test_consistent_gates_and_bands_are_accepted(tmp_path, body):
     pol = tmp_path / "p.yaml"
     pol.write_text(f"apiVersion: agent-assurance/policy/v1\n{body}\n", encoding="utf-8")
     assert cli.main(["validate", "--policy", str(pol)]) == cli.EXIT_OK
+
+
+def test_an_empty_gate_is_valid_but_warned_every_time(tmp_path, capsys):
+    """Report-only use is legitimate; an open band gate is never silent."""
+    pol = tmp_path / "p.yaml"
+    pol.write_text("apiVersion: agent-assurance/policy/v1\nname: report-only\ngate: {review_bands: [], fail_bands: []}\n", encoding="utf-8")
+    assert cli.main(["validate", "--policy", str(pol)]) == cli.EXIT_OK
+    assert "warning: the gate lists no band" in capsys.readouterr().out
+
+    out = tmp_path / "r.json"
+    code = cli.main(["check", "all", str(REPOS.parent / "dangerous-agent.yaml"), "--policy", str(pol), "--format", "json", "-o", str(out)])
+    err = capsys.readouterr().err
+    assert f"warning: policy {pol}: the gate lists no band" in err
+    aa1 = next(c for c in json.loads(out.read_text(encoding="utf-8"))["checks"] if c["id"] == "AA-001")
+    assert aa1["data"]["band"] == "CRITICAL" and aa1["status"] == "PASS"
+    assert code == cli.EXIT_OK
+
+
+def test_a_default_gate_has_no_warning(tmp_path, capsys):
+    assert policy.Policy().warnings() == []
+    pol = tmp_path / "p.yaml"
+    pol.write_text("apiVersion: agent-assurance/policy/v1\ngate: {review_bands: [], fail_bands: [CRITICAL]}\n", encoding="utf-8")
+    assert cli.main(["scan", str(KEPT), "--policy", str(pol)]) == cli.EXIT_OK
+    assert "warning" not in capsys.readouterr().err

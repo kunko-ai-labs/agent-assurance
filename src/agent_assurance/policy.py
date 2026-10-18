@@ -170,6 +170,17 @@ class Policy(BaseModel):
     def is_default(self) -> bool:
         return self.path is None
 
+    def warnings(self) -> list[str]:
+        """Valid but worth saying out loud every time the policy is used."""
+        out = []
+        if not self.gate.review_bands and not self.gate.fail_bands:
+            out.append(
+                "the gate lists no band: AA-001 never reviews or fails on its risk band "
+                "(UNKNOWN capabilities and AA-002 still gate). Report-only use; "
+                "add bands to review_bands or fail_bands to gate on risk"
+            )
+        return out
+
 
 _DEFAULT = Policy()
 _current: Policy = _DEFAULT

@@ -90,6 +90,7 @@ runs:
         AA_CHECK: ${{ inputs.check }}
         AA_COMMENT: ${{ inputs.comment }}
         AA_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
+        AA_DIRECTORY: ${{ inputs.directory }}
       run: |
         bad() { echo "::error::agent-assurance: input '$1' must be $2"; exit 2; }
         case "$AA_MODE" in check|scan|diff) ;; *) bad mode "check, scan or diff" ;; esac
@@ -97,9 +98,15 @@ runs:
         case "$AA_FAIL_ON_DELTA" in true|false) ;; *) bad fail-on-delta "true or false" ;; esac
         case "$AA_ATTEST" in ""|write|sign) ;; *) bad attest "empty, write or sign" ;; esac
         case "$AA_CHECK" in ""|-*) bad check "a check id, an alias or 'all'" ;; esac
+        # diff mode joins directory to the base worktree: it must stay inside it.
+        if [ "$AA_MODE" = "diff" ]; then
+          case "/$AA_DIRECTORY/" in //*|*/../*) bad directory "a relative path without '..' in diff mode" ;; esac
+        fi
         # Not gate inputs: an unexpected value keeps its old meaning (false), with a warning.
-        case "$AA_COMMENT" in true|false) ;; *) echo "::warning::agent-assurance: input 'comment' is not 'true' or 'false'; no comment will be posted" ;; esac
-        case "$AA_UPLOAD_SARIF" in true|false) ;; *) echo "::warning::agent-assurance: input 'upload-sarif' is not 'true' or 'false'; the SARIF will not be uploaded" ;; esac
+        # The `if:` conditions compare without case, so TRUE and True mean true here too.
+        lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+        case "$(lower "$AA_COMMENT")" in true|false) ;; *) echo "::warning::agent-assurance: input 'comment' is not 'true' or 'false'; it counts as false, so no comment will be posted" ;; esac
+        case "$(lower "$AA_UPLOAD_SARIF")" in true|false) ;; *) echo "::warning::agent-assurance: input 'upload-sarif' is not 'true' or 'false'; it counts as false, so the SARIF will not be uploaded" ;; esac
 
     - name: "Check out the base tree (mode: diff)"
       if: ${{ inputs.mode == 'diff' }}
@@ -168,18 +175,19 @@ runs:
         print(v if v in ("PASS", "REVIEW", "FAIL") else "ERROR")
         PY
         )
-        echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
 
         if [ -f aa-report.md ]; then
           cat aa-report.md >> "$GITHUB_STEP_SUMMARY"
         fi
         # No report or no verdict is not a result: fail loudly and now, never as a pass.
         if [ "$code" -eq 2 ] || [ ! -f aa-report.md ] || [ "$verdict" = "ERROR" ]; then
+          echo "verdict=ERROR" >> "$GITHUB_OUTPUT"
           echo "::error::agent-assurance produced no verdict (exit $code). Check the inputs, the manifest path and its schema." \
             | tee -a "$GITHUB_STEP_SUMMARY"
           echo "gate=tripped" >> "$GITHUB_OUTPUT"
           exit 2
         fi
+        echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
         # exit 1 = the gate tripped; a FAIL verdict trips it whatever the exit code.
         if [ "$code" -ne 0 ] || [ "$verdict" = "FAIL" ]; then
           echo "gate=tripped" >> "$GITHUB_OUTPUT"
@@ -208,12 +216,14 @@ runs:
         PR: ${{ github.event.pull_request.number }}
         AA_DIRECTORY: ${{ inputs.directory }}
       # One comment per (directory), updated on every push instead of a new one.
-      # The marker reaches jq as data (--arg), never as part of the filter.
+      # The marker reaches jq as data (--arg), never as part of the filter, and
+      # only a comment written by github-actions[bot] is ever edited: anyone can
+      # post a comment that starts with the marker.
       run: |
         marker="<!-- agent-assurance:$AA_DIRECTORY -->"
         { printf '%s\n' "$marker"; cat aa-report.md; } > aa-comment.md
         id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-              | jq -r --arg m "$marker" '.[] | select(.body | startswith($m)) | .id' | head -1 || true)
+              | jq -r --arg m "$marker" '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith($m))) | .id' | head -1 || true)
         if [ -n "$id" ]; then
           gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@aa-comment.md > /dev/null
           echo "updated comment $id"

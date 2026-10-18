@@ -105,6 +105,8 @@ tool_definition_files: [agents/tools.yaml]
 
 A policy that could open the gate by mistake is refused with exit `2`, never run more quietly: weights below 0; band bounds that do not rise strictly (`0 < medium < high < critical`); a gate band that is not `LOW`, `MEDIUM`, `HIGH` or `CRITICAL` (a typo would never match); a band in both `review_bands` and `fail_bands`; and a gate that weakens as risk rises (above a failing band every band must fail; above a reviewed band every band must be reviewed or fail). `max_autonomy_with_human` is 0 to 5, like the manifest's autonomy.
 
+A gate with no band at all (`review_bands: []` and `fail_bands: []`) is valid, for report-only use, but it opens every band: AA-001 then never reviews or fails on its risk band. An `UNKNOWN` capability still makes AA-001 a REVIEW, and AA-002 still gates the promise. `validate`, `scan`, `check` and `diff` print a warning every time such a policy is used.
+
 No policy = the built-in model, exactly (asserted in tests). With a policy, every report, card and attestation records its name and sha256: a verdict is reproducible only with the policy that produced it. Example: [`examples/repos/policy-org`](../examples/repos/policy-org).
 
 ## Design rules (what you can rely on)

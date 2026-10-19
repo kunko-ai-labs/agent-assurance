@@ -91,13 +91,16 @@ def _apply_policy(args: argparse.Namespace, directory: str | None = None) -> int
     if not path:
         return EXIT_OK
     try:
-        policy.activate(policy.load(path))
+        loaded = policy.load(path)
     except FileNotFoundError:
         print(f"error: policy not found: {path}", file=sys.stderr)
         return EXIT_USAGE
     except ManifestError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE
+    for msg in loaded.warnings():
+        print(f"warning: policy {path}: {msg}", file=sys.stderr)
+    policy.activate(loaded)
     return EXIT_OK
 
 
@@ -160,6 +163,8 @@ def _validate_policy(path: str) -> int:
     print(f"ok: {path} is a valid {policy.API_VERSION} policy")
     print(f"    name={pol.name} sha256={pol.sha256}")
     print(f"    overrides: {_policy_override_summary(pol)}")
+    for msg in pol.warnings():
+        print(f"    warning: {msg}")
     from .scan.claude_settings import ignored_policy_entries
 
     for entry, reason in ignored_policy_entries(pol):

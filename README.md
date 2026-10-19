@@ -4,7 +4,7 @@
 
 **Declare what your agent may do. Verify it on every edit, every PR, every release.**
 
-Your repo *promises* what an AI agent is allowed to do (`agent-assurance.yaml`: read the CRM, no external send, a human approves actions). Agent Assurance *observes* what the configuration actually grants — MCP servers, Claude Code permissions, tool definitions — and fails the change when the promise is broken, pointing at the file and line that broke it. Then it leaves a signed record of what the agent could do, and when.
+Your repo *promises* what an AI agent is allowed to do (`agent-assurance.yaml`: read the CRM, no external send, a human approves actions). Agent Assurance *observes* what the configuration actually grants — MCP servers, Claude Code permissions, tool definitions — and fails the change when the promise is broken, pointing at the file and line that broke it. Then it leaves a record of what the agent could do, and when, which you can have signed with Sigstore.
 
 No dashboard, no backend, no LLM in the verdict, no network calls, nothing executed. Rules you can read; numbers you can reproduce by hand.
 
@@ -45,7 +45,7 @@ Vulnerability scanners look for poisoned tools and leaked secrets. Permission-di
 | **Verifies a declared promise** | — | — | ✅ file:line |
 | Knows *having* a power ≠ *using it without a human* | — | — | ✅ |
 | OWASP Agentic Top 10 mapping | — | — | ✅ |
-| Signed, per-commit evidence (in-toto / Sigstore) | — | — | ✅ |
+| Per-commit evidence (in-toto; Sigstore signing opt-in) | — | — | ✅ |
 | LLM in the verdict | some | — | never |
 
 Checked 2026-09-17; details and sources in [`docs/landscape.md`](docs/landscape.md). This is the governance layer *under* a scanner, not a replacement for one.
@@ -58,7 +58,7 @@ Checked 2026-09-17; details and sources in [`docs/landscape.md`](docs/landscape.
 |---|---|---|
 | **While the agent edits** | [MCP server](contrib/claude-code/) (`would_break`) or [Claude Code hook](contrib/claude-code/) | The agent is told, in the same turn, that its edit breaks the promise |
 | **In the pull request** | GitHub Action `mode: diff` | One comment, updated on every push, plus a red check |
-| **On every push / release** | Action `mode: scan` + SARIF + `attest` | Findings in the Security tab; an in-toto attestation (Sigstore-signed when public) of what the agent could do at that commit |
+| **On every push / release** | Action `mode: scan` + SARIF + `attest` | Findings in the Security tab; an in-toto attestation (unsigned with `attest: write`, Sigstore-signed with `attest: sign`) of what the agent could do at that commit |
 
 Same engine, same words, everywhere.
 
@@ -86,8 +86,10 @@ steps:
       mode: diff                 # on pull_request; use scan on push
       manifest: agent-assurance.yaml
       card: aa-card.html         # optional: shareable capability card
-      attest: write              # optional: in-toto evidence (sign = Sigstore)
+      attest: write              # optional: unsigned in-toto evidence; 'sign' also signs it with Sigstore
 ```
+
+**What fails the job:** `FAIL` always does. `REVIEW` fails it with `fail-on: review`; with the default `fail-on: fail` the job continues on purpose and the run shows a warning. An unknown capability or a promise that cannot be verified is `REVIEW`, never `PASS`. No verdict at all (bad input, missing manifest, no report) fails the job. The Action's `verdict` output says which one it was. Details: [`docs/integrations.md`](docs/integrations.md#github-action).
 
 CLI (`scan`, `diff`, `check`, `attest`, `validate`; formats `md`, `json`, `sarif`, `html`), pre-commit, MCP server, Claude Code hook and the Python API: [`docs/integrations.md`](docs/integrations.md).
 
@@ -95,7 +97,7 @@ CLI (`scan`, `diff`, `check`, `attest`, `validate`; formats `md`, `json`, `sarif
 
 ### Running third-party code in your CI — what you should check
 
-- **Pin by commit SHA**, not by tag. Tags can move; a SHA cannot. Get the SHA of any release with `gh api repos/kunko-ai-labs/agent-assurance/git/ref/tags/v0.6.1 --jq .object.sha` and write `uses: kunko-ai-labs/agent-assurance@<that sha>  # v0.6.1`; Dependabot keeps the SHA and the version comment in step. Our own workflows pin every action the same way.
+- **Pin by commit SHA**, not by tag. Tags can move; a SHA cannot. Get the SHA of any release with `gh api repos/kunko-ai-labs/agent-assurance/git/ref/tags/v0.6.2 --jq .object.sha` and write `uses: kunko-ai-labs/agent-assurance@<that sha>  # v0.6.2`; Dependabot keeps the SHA and the version comment in step. Our own workflows pin every action the same way.
 - **What the Action does:** `pip install` of this repository at that SHA, then runs the CLI on your files. It makes **no network calls** of its own (the only outbound traffic is `pip` and, if you opt in, `upload-sarif` / `attest` to GitHub). It executes nothing from your repo, never starts an MCP server, never reads a secret's value.
 - **Least privilege:** `contents: read` is enough for `check` and `scan`; add `pull-requests: write` only for the diff comment, `security-events: write` only for SARIF upload, `id-token: write` + `attestations: write` only for signing.
 - **Verify what you get:** every release is signed; `gh attestation verify` on the artifacts, and the [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/kunko-ai-labs/agent-assurance) of this repo is public.

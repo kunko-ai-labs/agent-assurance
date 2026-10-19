@@ -55,7 +55,7 @@ build-backend = "hatchling.build"
 packages = ["src/agent_assurance"]
 
 [tool.hatch.build.targets.sdist]
-exclude = ["CLAUDE.md", "AGENTS.md", ".claude", "*.local.md"]
+exclude = ["/CLAUDE.md", "/AGENTS.md", "/.claude", "/*.local.md"]
 
 [tool.ruff]
 line-length = 100

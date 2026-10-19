@@ -8,7 +8,7 @@ Modelo de permisos de Claude Code: `allow` no concede capacidad, **quita al huma
 
 Por qué esto y no "diff de permisos": ya existe ×5 sin tracción (`docs/landscape.md`). Nadie verifica promesas ni mapea a OWASP.
 
-No es: un motor en runtime, un interceptor de tool calls, un ledger, un sistema de aprobaciones. Eso es otro producto (carril empresa de Kunko AI Labs); aquí no entra código de eso.
+No es: un motor en runtime, un interceptor de tool calls, un ledger, un sistema de aprobaciones. Eso queda fuera de este repo; aquí no entra código de eso.
 
 ## Contratos que no se rompen sin avisar
 
@@ -34,4 +34,4 @@ No es: un motor en runtime, un interceptor de tool calls, un ledger, un sistema 
 
 ## Roadmap vigente
 
-Está en el README (§Roadmap). Las decisiones de programa viven en el repo privado `vmbb13/ideas-ia-plan-personal` (doc 12). Si algo aquí contradice a ese doc, manda el doc y se abre issue.
+Está en el README (§Roadmap). Si algo aquí contradice al roadmap, se abre issue.

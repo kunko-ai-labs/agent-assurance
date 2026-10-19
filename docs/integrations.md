@@ -28,7 +28,7 @@ Formats: `md` (PR comment / job summary), `json` (pipelines), `sarif` (GitHub co
 
 ## Capability card
 
-`--format html` writes a single self-contained file — no scripts, no external assets — that reads like a nutrition label: verdict, the promise, what was observed with file:line and whether a human is in the loop, the score breakdown, sources scanned, policy and tool version. Same facts as the JSON. Send it to an auditor, a customer, or your manager; in the Action, `card: aa-card.html` uploads it as an artifact.
+`--format html` writes a single self-contained file — no scripts, no external assets — that reads like a nutrition label: verdict, the promise, what was observed with file:line and whether a human is in the loop, the score breakdown, sources scanned, policy and tool version. Same facts as the JSON. Send it to an auditor, a customer, or your manager; in the Action, `card: aa-card.html` uploads it as an artifact. It also prints cleanly: on paper or saved to PDF the page is white, the verdict colours stay legible, cards and table rows do not split across pages, and the footer keeps the tool version.
 
 ![Capability card for a broken promise](capability-card.png)
 

@@ -21,3 +21,10 @@ venv/
 *.sarif
 aa-report.md
 docs/.frames/
+
+# Maintainer editor and agent configuration (kept local, never published)
+/CLAUDE.md
+/AGENTS.md
+/GEMINI.md
+/.claude/
+.claude/worktrees/

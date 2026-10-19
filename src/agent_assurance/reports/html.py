@@ -40,6 +40,17 @@ ul{padding-left:20px;margin:6px 0}footer{margin-top:28px;color:var(--muted);font
 .card{border:1px solid var(--line);border-radius:6px;padding:10px 12px}.card .v{font-size:20px;font-weight:700}
 section.delta{border-left:4px solid var(--accent);padding:8px 14px;margin-bottom:20px;background:var(--code)}
 section.delta .title{font-weight:700;color:var(--accent)}
+@media print{
+  :root,:root:not([data-theme="light"]),:root[data-theme="dark"]{color-scheme:light;--bg:#fff;--panel:#fff;--fg:#000;--muted:#333;--line:#999;--row:#e2e2e2;--code:#f4f4f4;--link:#000;
+        --pass:#116329;--review:#6b4e00;--fail:#a4211f}
+  body{background:#fff;padding:0}
+  main{max-width:none;border:0;border-radius:0;padding:0;box-shadow:none}
+  a{text-decoration:none;color:var(--fg)}
+  .badge{color:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .card,section.delta,footer,tr,.grid{break-inside:avoid;page-break-inside:avoid}
+  thead{display:table-header-group}h2{break-after:avoid;page-break-after:avoid}
+  footer{border-top:1px solid var(--line);padding-top:6px}
+}
 """
 
 

@@ -5,6 +5,10 @@ branding:
   icon: "shield"
   color: "red"
 
+# Every input reaches the scripts below through `env:` and is quoted as "$VAR".
+# No `run:` body contains an expression or `eval`; tests/test_action_inputs.py
+# enforces this and runs the scripts with hostile input values.
+
 inputs:
   mode:
     description: "'check' runs the checks on the manifest alone; 'scan' observes the repo's agent configuration and verifies it against the manifest if one exists; 'diff' (on pull_request) compares base vs head and reports what the change does to reach and promise"
@@ -15,7 +19,7 @@ inputs:
     required: false
     default: "true"
   fail-on-delta:
-    description: "In diff mode: also fail when reach grows, the band rises or the promise breaks (default true)"
+    description: "In diff mode: also fail when reach grows, the band rises or the promise breaks. 'true' (default) or 'false'"
     required: false
     default: "true"
   directory:
@@ -31,7 +35,7 @@ inputs:
     required: false
     default: "all"
   fail-on:
-    description: "Gate on 'fail' (default) or 'review'"
+    description: "What fails the job: 'fail' (default) fails on FAIL only and lets REVIEW through with a warning; 'review' fails on REVIEW and FAIL. A result that cannot be verified is REVIEW, never PASS"
     required: false
     default: "fail"
   sarif:
@@ -51,9 +55,17 @@ inputs:
     required: false
     default: ""
   attest:
-    description: "Write an in-toto attestation (aa-attestation.json, uploaded as an artifact) and, when 'sign', also sign it with Sigstore via actions/attest (needs permissions: id-token: write, attestations: write; public repo or GitHub Enterprise). Values: '', 'write', 'sign'"
+    description: "'' (default): no attestation. 'write': write an unsigned in-toto statement (aa-attestation.json, uploaded as an artifact). 'sign': write it and sign it with Sigstore via actions/attest (needs permissions: id-token: write, attestations: write; public repo or GitHub Enterprise). Only 'sign' produces a signature"
     required: false
     default: ""
+
+outputs:
+  verdict:
+    description: "PASS, REVIEW or FAIL (in diff mode, the head side's verdict). An unknown capability or a promise that cannot be verified is REVIEW, never PASS. ERROR when no verdict was produced; the job then fails"
+    value: ${{ steps.run.outputs.verdict }}
+  gate:
+    description: "'tripped' when the verdict (or, in diff mode, the delta) fails the job under fail-on / fail-on-delta; 'open' otherwise"
+    value: ${{ steps.run.outputs.gate }}
 
 runs:
   using: "composite"
@@ -65,58 +77,134 @@ runs:
 
     - name: Install agent-assurance
       shell: bash
-      run: pip install "${{ github.action_path }}"
+      run: pip install "$GITHUB_ACTION_PATH"
+
+    - name: Validate inputs
+      shell: bash
+      # Input values are never echoed here: a value is data, not a log line.
+      env:
+        AA_MODE: ${{ inputs.mode }}
+        AA_FAIL_ON: ${{ inputs.fail-on }}
+        AA_FAIL_ON_DELTA: ${{ inputs.fail-on-delta }}
+        AA_ATTEST: ${{ inputs.attest }}
+        AA_CHECK: ${{ inputs.check }}
+        AA_COMMENT: ${{ inputs.comment }}
+        AA_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
+        AA_DIRECTORY: ${{ inputs.directory }}
+      run: |
+        bad() { echo "::error::agent-assurance: input '$1' must be $2"; exit 2; }
+        case "$AA_MODE" in check|scan|diff) ;; *) bad mode "check, scan or diff" ;; esac
+        case "$AA_FAIL_ON" in fail|review) ;; *) bad fail-on "fail or review" ;; esac
+        case "$AA_FAIL_ON_DELTA" in true|false) ;; *) bad fail-on-delta "true or false" ;; esac
+        case "$AA_ATTEST" in ""|write|sign) ;; *) bad attest "empty, write or sign" ;; esac
+        case "$AA_CHECK" in ""|-*) bad check "a check id, an alias or 'all'" ;; esac
+        # diff mode joins directory to the base worktree: it must stay inside it.
+        if [ "$AA_MODE" = "diff" ]; then
+          case "/$AA_DIRECTORY/" in //*|*/../*) bad directory "a relative path without '..' in diff mode" ;; esac
+        fi
+        # Not gate inputs: an unexpected value keeps its old meaning (false), with a warning.
+        # The `if:` conditions compare without case, so TRUE and True mean true here too.
+        lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+        case "$(lower "$AA_COMMENT")" in true|false) ;; *) echo "::warning::agent-assurance: input 'comment' is not 'true' or 'false'; it counts as false, so no comment will be posted" ;; esac
+        case "$(lower "$AA_UPLOAD_SARIF")" in true|false) ;; *) echo "::warning::agent-assurance: input 'upload-sarif' is not 'true' or 'false'; it counts as false, so the SARIF will not be uploaded" ;; esac
 
     - name: "Check out the base tree (mode: diff)"
       if: ${{ inputs.mode == 'diff' }}
       shell: bash
+      env:
+        AA_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
       # The PR base goes into a detached worktree; nothing in it is executed.
       run: |
-        base="${{ github.event.pull_request.base.sha || github.event.before }}"
-        if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+        if [ -z "$AA_BASE" ] || [ "$AA_BASE" = "0000000000000000000000000000000000000000" ]; then
           echo "::error::diff mode needs a pull_request (or push with a previous commit) event"; exit 2
         fi
-        git fetch --no-tags --depth=1 origin "$base"
-        git worktree add --detach "$RUNNER_TEMP/aa-base" "$base"
-        echo "base=$base"
+        git fetch --no-tags --depth=1 origin "$AA_BASE"
+        git worktree add --detach "$RUNNER_TEMP/aa-base" "$AA_BASE"
+        echo "base=$AA_BASE"
 
-    - name: Resolve command
+    - name: Run Agent Assurance
+      id: run
       shell: bash
-      # One place decides the CLI invocation, so the report and SARIF steps agree.
+      env:
+        AA_MODE: ${{ inputs.mode }}
+        AA_DIRECTORY: ${{ inputs.directory }}
+        AA_MANIFEST: ${{ inputs.manifest }}
+        AA_CHECK: ${{ inputs.check }}
+        AA_POLICY: ${{ inputs.policy }}
+        AA_FAIL_ON: ${{ inputs.fail-on }}
+        AA_FAIL_ON_DELTA: ${{ inputs.fail-on-delta }}
+        AA_SARIF: ${{ inputs.sarif }}
+        AA_CARD: ${{ inputs.card }}
+      # One argv, built here as an array, serves every format so the report,
+      # the verdict, the SARIF and the card agree. Options take their value
+      # after '='; a positional path that starts with '-' gets './' in front,
+      # so no input value can turn into an option.
       run: |
-        case "${{ inputs.mode }}" in
+        dir=$AA_DIRECTORY
+        case "$dir" in -*) dir="./$dir" ;; esac
+        manifest=$AA_MANIFEST
+        case "$manifest" in -*) manifest="./$manifest" ;; esac
+        case "$AA_MODE" in
           scan)
-            cmd=(agent-assurance scan "${{ inputs.directory }}" --check "${{ inputs.check }}")
-            if [ -f "${{ inputs.manifest }}" ]; then cmd+=(--manifest "${{ inputs.manifest }}"); fi ;;
+            args=(scan "$dir" "--check=$AA_CHECK")
+            if [ -f "$AA_MANIFEST" ]; then args+=("--manifest=$AA_MANIFEST"); fi ;;
           diff)
-            cmd=(agent-assurance diff "$RUNNER_TEMP/aa-base/${{ inputs.directory }}" "${{ inputs.directory }}")
-            if [ "${{ inputs.fail-on-delta }}" = "true" ]; then cmd+=(--fail-on-delta); fi ;;
+            args=(diff "$RUNNER_TEMP/aa-base/$AA_DIRECTORY" "$dir")
+            if [ "$AA_FAIL_ON_DELTA" = "true" ]; then args+=(--fail-on-delta); fi ;;
           *)
-            cmd=(agent-assurance check "${{ inputs.check }}" "${{ inputs.manifest }}") ;;
+            args=(check "$AA_CHECK" "$manifest") ;;
         esac
-        if [ -n "${{ inputs.policy }}" ]; then cmd+=(--policy "${{ inputs.policy }}"); fi
-        printf '%q ' "${cmd[@]}" > .aa-cmd
-        echo "command: $(cat .aa-cmd)"
+        if [ -n "$AA_POLICY" ]; then args+=("--policy=$AA_POLICY"); fi
+        printf 'command: agent-assurance'; printf ' %q' "${args[@]}"; echo
 
-    - name: Run Agent Assurance (markdown -> job summary)
-      shell: bash
-      run: |
+        json="$RUNNER_TEMP/aa-report.json"
+        rm -f aa-report.md "$json"
         set +e
-        eval "$(cat .aa-cmd)" --format md --output aa-report.md --fail-on "${{ inputs.fail-on }}"
+        agent-assurance "${args[@]}" --format md --output=aa-report.md "--fail-on=$AA_FAIL_ON"
         code=$?
+        agent-assurance "${args[@]}" --format json "--output=$json" "--fail-on=$AA_FAIL_ON" 2> /dev/null
         set -e
+        verdict=$(python3 - "$json" <<'PY'
+        import json, sys
+        try:
+            with open(sys.argv[1], encoding="utf-8") as fh:
+                d = json.load(fh)
+            v = (d["head"] if d.get("kind") == "diff" else d)["verdict"]
+        except Exception:
+            v = "ERROR"
+        print(v if v in ("PASS", "REVIEW", "FAIL") else "ERROR")
+        PY
+        )
 
         if [ -f aa-report.md ]; then
           cat aa-report.md >> "$GITHUB_STEP_SUMMARY"
-        else
-          echo "agent-assurance produced no report (exit $code). Check the manifest path and schema." \
+        fi
+        # No report or no verdict is not a result: fail loudly and now, never as a pass.
+        if [ "$code" -eq 2 ] || [ ! -f aa-report.md ] || [ "$verdict" = "ERROR" ]; then
+          echo "verdict=ERROR" >> "$GITHUB_OUTPUT"
+          echo "::error::agent-assurance produced no verdict (exit $code). Check the inputs, the manifest path and its schema." \
             | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "gate=tripped" >> "$GITHUB_OUTPUT"
+          exit 2
+        fi
+        echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+        # exit 1 = the gate tripped; a FAIL verdict trips it whatever the exit code.
+        if [ "$code" -ne 0 ] || [ "$verdict" = "FAIL" ]; then
+          echo "gate=tripped" >> "$GITHUB_OUTPUT"
+        else
+          echo "gate=open" >> "$GITHUB_OUTPUT"
+          if [ "$verdict" = "REVIEW" ]; then
+            echo "::warning::Agent Assurance verdict is REVIEW: a human should look at it. The job continues because fail-on is 'fail'; set fail-on: review to block on it."
+          fi
         fi
 
-        # exit 2 = usage/manifest error, not a policy verdict: fail loudly and now.
-        if [ "$code" -eq 2 ]; then exit 2; fi
-        # exit 1 = the assurance gate tripped: recorded, enforced in the final step.
-        if [ "$code" -ne 0 ]; then echo "AA_FAILED=1" >> "$GITHUB_ENV"; fi
+        # The verdict is recorded above; here only exit 2 (no output) matters.
+        if [ -n "$AA_SARIF" ]; then
+          agent-assurance "${args[@]}" --format sarif "--output=$AA_SARIF" || [ $? -ne 2 ]
+        fi
+        if [ -n "$AA_CARD" ]; then
+          agent-assurance "${args[@]}" --format html "--output=$AA_CARD" || [ $? -ne 2 ]
+        fi
 
     - name: "Comment on the pull request (mode: diff)"
       # Skipped on pull requests from forks: their token cannot write comments.
@@ -126,31 +214,22 @@ runs:
         GH_TOKEN: ${{ github.token }}
         REPO: ${{ github.repository }}
         PR: ${{ github.event.pull_request.number }}
+        AA_DIRECTORY: ${{ inputs.directory }}
       # One comment per (directory), updated on every push instead of a new one.
+      # The marker reaches jq as data (--arg), never as part of the filter, and
+      # only a comment written by github-actions[bot] is ever edited: anyone can
+      # post a comment that starts with the marker.
       run: |
-        marker="<!-- agent-assurance:${{ inputs.directory }} -->"
-        { echo "$marker"; cat aa-report.md; } > aa-comment.md
+        marker="<!-- agent-assurance:$AA_DIRECTORY -->"
+        { printf '%s\n' "$marker"; cat aa-report.md; } > aa-comment.md
         id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-              --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -1 || true)
+              | jq -r --arg m "$marker" '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith($m))) | .id' | head -1 || true)
         if [ -n "$id" ]; then
           gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@aa-comment.md > /dev/null
           echo "updated comment $id"
         else
           gh pr comment "$PR" --body-file aa-comment.md
         fi
-
-    - name: Emit SARIF (optional)
-      if: ${{ inputs.sarif != '' }}
-      shell: bash
-      # The verdict was already recorded above; here only exit 2 (no report) matters.
-      run: |
-        eval "$(cat .aa-cmd)" --format sarif --output "${{ inputs.sarif }}" || [ $? -ne 2 ]
-
-    - name: "Write capability card (optional)"
-      if: ${{ inputs.card != '' }}
-      shell: bash
-      run: |
-        eval "$(cat .aa-cmd)" --format html --output "${{ inputs.card }}" || [ $? -ne 2 ]
 
     - name: Upload capability card
       if: ${{ inputs.card != '' }}
@@ -159,26 +238,35 @@ runs:
         name: agent-assurance-card
         path: ${{ inputs.card }}
 
-    - name: "Write attestation (optional)"
+    - name: "Write attestation (optional, unsigned)"
       if: ${{ inputs.attest != '' && inputs.mode != 'diff' }}
       id: attest
       shell: bash
-      # Evidence is written whatever the verdict; only a usage error (2) stops here.
-      run: |
-        dir="${{ inputs.directory }}"
-        cmd=(agent-assurance attest "$dir" --check "${{ inputs.check }}")
-        if [ -f "${{ inputs.manifest }}" ]; then cmd+=(--manifest "${{ inputs.manifest }}"); fi
-        if [ -n "${{ inputs.policy }}" ]; then cmd+=(--policy "${{ inputs.policy }}"); fi
-        "${cmd[@]}" --output aa-attestation.json || [ $? -ne 2 ]
-        python3 - <<'PY' >> "$GITHUB_OUTPUT"
-        import json, os
-        s = json.load(open("aa-attestation.json"))
-        d = os.environ.get("DIR", ".")
-        paths = "\n".join(os.path.normpath(os.path.join(d, x["name"])) for x in s["subject"])
-        print("subjects<<EOF\n" + paths + "\nEOF")
-        PY
       env:
-        DIR: ${{ inputs.directory }}
+        AA_DIRECTORY: ${{ inputs.directory }}
+        AA_MANIFEST: ${{ inputs.manifest }}
+        AA_CHECK: ${{ inputs.check }}
+        AA_POLICY: ${{ inputs.policy }}
+      # Evidence is written whatever the verdict; only a usage error (2) stops here.
+      # Writing the statement is not signing it: only the Sigstore step below signs.
+      run: |
+        dir=$AA_DIRECTORY
+        case "$dir" in -*) dir="./$dir" ;; esac
+        args=(attest "$dir" "--check=$AA_CHECK")
+        if [ -f "$AA_MANIFEST" ]; then args+=("--manifest=$AA_MANIFEST"); fi
+        if [ -n "$AA_POLICY" ]; then args+=("--policy=$AA_POLICY"); fi
+        rm -f aa-attestation.json
+        agent-assurance "${args[@]}" --output=aa-attestation.json || [ $? -ne 2 ]
+        python3 - <<'PY' >> "$GITHUB_OUTPUT"
+        import json, os, secrets
+        with open("aa-attestation.json", encoding="utf-8") as fh:
+            s = json.load(fh)
+        d = os.environ.get("AA_DIRECTORY", ".")
+        paths = "\n".join(os.path.normpath(os.path.join(d, x["name"])) for x in s["subject"])
+        # A random delimiter: no path can end the multiline output early.
+        eof = "EOF_" + secrets.token_hex(16)
+        print(f"subjects<<{eof}\n{paths}\n{eof}")
+        PY
 
     - name: Upload attestation artifact
       if: ${{ inputs.attest != '' && inputs.mode != 'diff' }}
@@ -203,8 +291,11 @@ runs:
         category: agent-assurance
 
     - name: Fail if assurance gate tripped
-      if: ${{ env.AA_FAILED == '1' }}
+      if: ${{ steps.run.outputs.gate == 'tripped' }}
       shell: bash
+      env:
+        AA_FAIL_ON: ${{ inputs.fail-on }}
+        AA_VERDICT: ${{ steps.run.outputs.verdict }}
       run: |
-        echo "Agent Assurance gate failed (fail-on=${{ inputs.fail-on }})." >&2
+        echo "Agent Assurance gate failed (verdict=$AA_VERDICT, fail-on=$AA_FAIL_ON)." >&2
         exit 1

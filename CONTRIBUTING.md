@@ -50,8 +50,9 @@ How each pull request is merged:
 | `feat/*`, `fix/*`, `docs/*` into `develop` or `staging` | **Squash** | One commit per change; the PR title becomes the commit |
 | `staging` → `main` (release) | **Create a merge commit** | `main` and `staging` keep a shared history, so the next release merges cleanly |
 | `main` → `staging`, `main` → `develop` (sync) | **Create a merge commit** | Same reason; a squashed sync looks like new work to git and conflicts later |
+| Any release or sync | Never **Rebase and merge** | It rewrites every commit, including contributors' commits, and the branches lose their shared history |
 
-Never squash a release or a sync. After any `hotfix/*` reaches `main`, sync `main` into `staging` and into `develop` with a merge commit before the next release.
+Never squash or rebase a release or a sync. After any `hotfix/*` reaches `main`, sync `main` into `staging` and into `develop` with a merge commit before the next release. If a sync has conflicts, open a `sync/*` branch from the source branch, merge the target branch into it, resolve the conflicts there, and open the pull request from `sync/*` into the target (as in #74).
 
 Release: see [`docs/RELEASING.md`](docs/RELEASING.md). In short, the version is bumped on `staging`, `staging` is merged into `main`, and the tag `vX.Y.Z` on `main` builds and publishes the release. Every release is a tag `vX.Y.Z` plus a moving `vX.Y` for the Action. Security fixes are prepared privately in a security advisory and reach `main` as a hotfix.
 

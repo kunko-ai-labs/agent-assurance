@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write        # attach artifacts to the release
       id-token: write        # Sigstore
@@ -44,7 +44,7 @@ jobs:
 
   publish:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: pypi        # create it in Settings > Environments; PyPI trusted publisher points here
     permissions:
       id-token: write

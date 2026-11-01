@@ -36,14 +36,25 @@ Welcome. A fork PR runs with a read-only token, so two things behave differently
 
 ## Branches
 
-Changes flow in one direction, `develop` → `staging` → `main`, and each step is a reviewed pull request.
+Changes move forward `develop` → `staging` → `main`, and each step is a reviewed pull request.
 
-- `develop` is where contributions land. Open your pull request from a `feat/*`, `fix/*` or `docs/*` branch into `develop`. The CI (`ci.yml`) and the dogfood (`assurance.yml`) run on every PR.
-- `staging` holds what the maintainers have accepted for the next release. They bring changes over from `develop` one by one, after review. A change in `develop` is not automatically in the next release.
-- `main` is the release branch, and it is releasable at all times. It accepts pull requests only from `staging`, or from a maintainer's `hotfix/*` branch. A required check (`branch-flow.yml`) enforces this, and only the maintainer merges into `main`. Every release is a tag `vX.Y.Z` plus a moving `vX.Y` for the Action.
+- `develop` is where outside contributions land. Open your pull request from a `feat/*`, `fix/*` or `docs/*` branch into `develop`. The CI (`ci.yml`) and the dogfood (`assurance.yml`) run on every PR.
+- `staging` holds what the maintainers have accepted for the next release. Maintainers open their own `feat/*`, `fix/*` and `docs/*` pull requests into `staging`, and bring changes over from `develop` one by one, after review. A change in `develop` is not automatically in the next release.
+- `main` is the release branch, and it is releasable at all times. It accepts pull requests only from `staging`, or from a maintainer's `hotfix/*` branch. A required check (`branch-flow.yml`) enforces this, and only the maintainer merges into `main`.
 - `demo/*` branches are living demos that must stay red (see PR #16). They are never merged.
 
-Release: `staging` → PR → `main` → bump version in `pyproject.toml` and `__init__.py` → tag → GitHub release with notes → move the `vX.Y` tag. Security fixes are prepared privately in a security advisory and reach `main` as a hotfix.
+How each pull request is merged:
+
+| Pull request | Merge method | Why |
+|---|---|---|
+| `feat/*`, `fix/*`, `docs/*` into `develop` or `staging` | **Squash** | One commit per change; the PR title becomes the commit |
+| `staging` → `main` (release) | **Create a merge commit** | `main` and `staging` keep a shared history, so the next release merges cleanly |
+| `main` → `staging`, `main` → `develop` (sync) | **Create a merge commit** | Same reason; a squashed sync looks like new work to git and conflicts later |
+| Any release or sync | Never **Rebase and merge** | It rewrites every commit, including contributors' commits, and the branches lose their shared history |
+
+Never squash or rebase a release or a sync. After any `hotfix/*` reaches `main`, sync `main` into `staging` and into `develop` with a merge commit before the next release. If a sync has conflicts, open a `sync/*` branch from the source branch, merge the target branch into it, resolve the conflicts there, and open the pull request from `sync/*` into the target (as in #74).
+
+Release: see [`docs/RELEASING.md`](docs/RELEASING.md). In short, the version is bumped on `staging`, `staging` is merged into `main`, and the tag `vX.Y.Z` on `main` builds and publishes the release. Every release is a tag `vX.Y.Z` plus a moving `vX.Y` for the Action. Security fixes are prepared privately in a security advisory and reach `main` as a hotfix.
 
 ## Before you push
 

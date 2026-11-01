@@ -17,7 +17,7 @@ permissions:
 jobs:
   medium-agent-passes:
     name: Medium-risk agent (must PASS)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run Agent Assurance
@@ -29,7 +29,7 @@ jobs:
 
   high-agent-reviews:
     name: High-risk agent (must PASS with fail-on=fail, BLOCK with fail-on=review)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: fail-on=fail lets REVIEW through
@@ -54,7 +54,7 @@ jobs:
 
   dangerous-agent-blocks:
     name: Dangerous agent (must BLOCK)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run Agent Assurance (expected to fail)
@@ -91,7 +91,7 @@ jobs:
 
   scan-promise-kept:
     name: scan — promise kept (must PASS) + attestation written
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write        # Sigstore signing
@@ -132,7 +132,7 @@ jobs:
 
   scan-promise-broken:
     name: scan — promise broken (must BLOCK)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run Agent Assurance (scan, expected to fail)
@@ -162,7 +162,7 @@ jobs:
 
   scan-claude-code-approval-kept:
     name: scan — Claude Code permissions within declared autonomy (must PASS)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./
@@ -174,7 +174,7 @@ jobs:
 
   scan-claude-code-approval-broken:
     name: scan — allow Bash(*) with declared L2 (must BLOCK)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: gate
@@ -192,7 +192,7 @@ jobs:
 
   scan-policy-org:
     name: scan — organisation policy (own catalogue, stricter gate; must PASS with fail-on=fail)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./
@@ -206,7 +206,7 @@ jobs:
 
   scan-codex-and-tools:
     name: scan — Codex config.toml + serialized tool definitions (must BLOCK on the token, review the guess)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: gate
